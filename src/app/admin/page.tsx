@@ -167,6 +167,12 @@ export default function AdminPage() {
                             </button>
                         </div>
 
+                        <Link
+                            href="/accounting"
+                            className="text-sm font-bold text-[var(--primary)] hover:text-white transition-colors border border-[var(--primary)] px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]"
+                        >
+                            Ver Contabilidad & Aforo
+                        </Link>
                         <button onClick={() => setIsAuthenticated(false)} className="text-sm text-gray-400 hover:text-white">
                             Cerrar Sesión
                         </button>
