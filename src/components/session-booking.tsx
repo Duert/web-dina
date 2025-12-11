@@ -128,39 +128,39 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
                         <h2 className="font-bold text-lg mb-4">Tus Datos</h2>
                         <div className="space-y-4 flex-1">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre Completo</label>
+                                <label className="block text-xs font-bold text-slate-900 uppercase mb-1">Nombre Completo</label>
                                 <input
                                     required
-                                    className="w-full p-2 border rounded-md"
+                                    className="w-full p-2 border-2 border-slate-300 rounded-md bg-white text-slate-900 focus:border-black focus:ring-0"
                                     placeholder="Juan Pérez"
                                     value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                                <label className="block text-xs font-bold text-slate-900 uppercase mb-1">Email</label>
                                 <input
                                     required type="email"
-                                    className="w-full p-2 border rounded-md"
+                                    className="w-full p-2 border-2 border-slate-300 rounded-md bg-white text-slate-900 focus:border-black focus:ring-0"
                                     placeholder="juan@ejemplo.com"
                                     value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Teléfono</label>
+                                <label className="block text-xs font-bold text-slate-900 uppercase mb-1">Teléfono</label>
                                 <input
                                     required type="tel"
-                                    className="w-full p-2 border rounded-md"
+                                    className="w-full p-2 border-2 border-slate-300 rounded-md bg-white text-slate-900 focus:border-black focus:ring-0"
                                     placeholder="600 00 00 00"
                                     value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
                                 />
                             </div>
 
-                            <div className="pt-4 border-t mt-4">
-                                <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-slate-500">Total a pagar</span>
-                                    <span className="font-bold">{totalAmount}€</span>
+                            <div className="pt-4 border-t border-slate-200 mt-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-slate-600 font-medium">Total a pagar</span>
+                                    <span className="font-black text-2xl text-slate-900">{totalAmount}€</span>
                                 </div>
-                                <div className="text-xs text-slate-400 bg-slate-50 p-2 rounded">
+                                <div className="text-xs text-slate-500 bg-slate-100 p-3 rounded border border-slate-200">
                                     * El pago se realizará manualmente mediante Bizum/Transferencia tras confirmar.
                                 </div>
                             </div>
