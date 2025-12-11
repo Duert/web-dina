@@ -36,7 +36,10 @@ export default async function AccountingPage() {
                     <div className="flex gap-3">
                         <ExportButton orders={orders || []} />
 
-                        <form action={cleanupExpiredOrders}>
+                        <form action={async () => {
+                            'use server';
+                            await cleanupExpiredOrders();
+                        }}>
                             <button type="submit" className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-orange-200 flex items-center gap-2 h-full">
                                 <Trash2 size={16} />
                                 Limpiar Caducados (+24h)
@@ -95,12 +98,18 @@ export default async function AccountingPage() {
                                     <td className="px-6 py-4 text-right">
                                         {order.payment_status === 'pending' && (
                                             <div className="flex justify-end gap-2">
-                                                <form action={confirmOrderPayment.bind(null, order.id)}>
+                                                <form action={async () => {
+                                                    'use server';
+                                                    await confirmOrderPayment(order.id);
+                                                }}>
                                                     <button title="Confirmar Pago" className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200 transition-all">
                                                         <CheckCircle size={18} />
                                                     </button>
                                                 </form>
-                                                <form action={cancelOrder.bind(null, order.id)}>
+                                                <form action={async () => {
+                                                    'use server';
+                                                    await cancelOrder(order.id);
+                                                }}>
                                                     <button title="Cancelar / Liberar" className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition-all">
                                                         <XCircle size={18} />
                                                     </button>
