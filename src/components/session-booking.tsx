@@ -8,11 +8,12 @@ import { Seat, Session } from "@/types";
 import { cn } from "@/lib/utils";
 
 // Mock pricing - In a real app this could also come from DB
+// Updated to single price as per client request
 const PRICES = {
-    'Preferente': 15,
-    'Zona 2': 12,
-    'Zona 3': 10,
-    'PMR': 12
+    'Preferente': 5,
+    'Zona 2': 5,
+    'Zona 3': 5,
+    'PMR': 5
 };
 
 interface SessionBookingProps {

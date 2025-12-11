@@ -92,14 +92,14 @@ export const sessions: Session[] = [
     {
         id: 'morning',
         name: 'Sesión Mañana',
-        date: '2026-06-20',
+        date: '2026-03-01T10:00:00',
         totalSeats: initialSeats.length,
         soldCount: 0
     },
     {
         id: 'afternoon',
         name: 'Sesión Tarde',
-        date: '2026-06-20',
+        date: '2026-03-01T15:30:00',
         totalSeats: initialSeats.length,
         soldCount: 0
     }
