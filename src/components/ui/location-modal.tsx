@@ -1,8 +1,7 @@
 "use client";
 
-import { X, MapPin, Upload, Trash2 } from "lucide-react";
+import { X, MapPin } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
 
 interface LocationModalProps {
     isOpen: boolean;
@@ -10,35 +9,8 @@ interface LocationModalProps {
 }
 
 export function LocationModal({ isOpen, onClose }: LocationModalProps) {
-    const [image, setImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        // Load saved image from localStorage on mount
-        const savedImage = localStorage.getItem("auditorium_image");
-        if (savedImage) {
-            setImage(savedImage);
-        }
-    }, []);
 
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result as string;
-                setImage(base64String);
-                localStorage.setItem("auditorium_image", base64String);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const removeImage = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setImage(null);
-        localStorage.removeItem("auditorium_image");
-    };
 
     if (!isOpen) return null;
 
@@ -81,51 +53,24 @@ export function LocationModal({ isOpen, onClose }: LocationModalProps) {
                             </p>
                         </div>
 
-                        {/* Image Uploader */}
-                        <div
-                            className="flex-1 min-h-[200px] bg-neutral-800 rounded-xl overflow-hidden relative border border-white/5 flex items-center justify-center group cursor-pointer hover:border-[var(--primary)] transition-colors"
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {image ? (
-                                <>
-                                    <Image
-                                        src={image}
-                                        alt="Fachada Auditorio"
-                                        fill
-                                        className="object-cover"
-                                    />
-                                    {/* Overlay with Remove button */}
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
-                                        <p className="text-sm font-bold mb-2">Cambiar imagen</p>
-                                        <button
-                                            onClick={removeImage}
-                                            className="bg-red-500/80 hover:bg-red-600 p-2 rounded-full text-white"
-                                            title="Eliminar imagen"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    {/* Placeholder visual */}
-                                    <div className="absolute inset-0 bg-[url('/placeholder-auditorium.jpg')] bg-cover bg-center opacity-20 grayscale"></div>
-
-                                    <div className="text-center p-4 relative z-10">
-                                        <Upload className="w-8 h-8 text-[var(--primary)] mx-auto mb-2 opacity-80" />
-                                        <p className="text-white/50 text-xs font-mono mb-1">FOTO ENTRADA</p>
-                                        <p className="text-[var(--primary)] text-sm font-bold hover:underline">Subir foto</p>
-                                    </div>
-                                </>
-                            )}
-
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                accept="image/*"
-                                onChange={handleImageUpload}
+                        {/* Static Image Display */}
+                        <div className="flex-1 min-h-[200px] bg-neutral-800 rounded-xl overflow-hidden relative border border-white/5 flex items-center justify-center">
+                            <Image
+                                src="/auditorium.jpg"
+                                alt="Fachada Auditorio"
+                                fill
+                                className="object-cover"
+                                onError={(e) => {
+                                    // Fallback if image doesn't exist
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = "https://images.unsplash.com/photo-1544983849-550a6b57116b?q=80&w=1000&auto=format&fit=crop"; // Generic fallback
+                                }}
                             />
+                            {/* Optional: Add a subtle overlay so it looks nice but isn't clickable */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+                            <div className="absolute bottom-4 left-4 z-10">
+                                <span className="bg-[var(--primary)] text-white text-xs font-bold px-2 py-1 rounded">Foto Oficial</span>
+                            </div>
                         </div>
                     </div>
 
