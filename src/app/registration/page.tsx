@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Plus, Trash2, Users, User, Save, Upload, FileText, CreditCard } from "lucide-react";
 import { DanceCategory, Registration, RegistrationResponsible, RegistrationParticipant } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { sendRegistrationEmail } from "@/app/actions-email";
 
 export default function RegistrationPage() {
     const [submitting, setSubmitting] = useState(false);
@@ -143,6 +144,14 @@ export default function RegistrationPage() {
                     .from('registration_participants')
                     .insert(participantsToInsert);
                 if (partError) throw partError;
+            }
+
+            // 5. Send Notification Email (Non-blocking or blocking? Better to just fire and forget or await without failing the UI)
+            try {
+                await sendRegistrationEmail(registrationId);
+            } catch (emailErr) {
+                console.error("Email notification failed:", emailErr);
+                // Don't block success screen
             }
 
             setSuccess(true);

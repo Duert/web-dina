@@ -6,6 +6,16 @@ import { Lock, LayoutDashboard, Users, FileText, X, Download, Eye, Ticket, Calen
 import { supabase } from "@/lib/supabase";
 import { resetApplicationData } from "@/app/actions-admin";
 import { Registration } from "@/types";
+import dynamic from "next/dynamic";
+import { RegistrationDocument } from "@/components/pdf/RegistrationDocument";
+
+const PDFDownloadLink = dynamic(
+    () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
+    {
+        ssr: false,
+        loading: () => <p>Cargando PDF...</p>,
+    }
+);
 
 // Extended interface for fetching
 interface RegistrationWithDetails extends Registration {
@@ -404,6 +414,21 @@ export default function AdminPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
+                                {selectedRegistration && (
+                                    <PDFDownloadLink
+                                        document={<RegistrationDocument registration={selectedRegistration} />}
+                                        fileName={`Inscripcion_${selectedRegistration.group_name.replace(/\s+/g, '_')}.pdf`}
+                                        className="bg-white/10 hover:bg-white/20 hover:text-white text-gray-300 text-sm font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                    >
+                                        {/* @ts-ignore */}
+                                        {({ loading }) => (
+                                            <>
+                                                <Download size={16} />
+                                                {loading ? 'Generando...' : 'Descargar PDF'}
+                                            </>
+                                        )}
+                                    </PDFDownloadLink>
+                                )}
                                 <Link
                                     href={`/admin/assign/${selectedRegistration.id}`}
                                     className="bg-[var(--primary)] hover:bg-pink-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-[0_0_15px_rgba(255,0,204,0.4)] flex items-center gap-2"
