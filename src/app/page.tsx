@@ -128,9 +128,21 @@ export default function Home() {
             <div className="text-left md:w-1/2">
               <span className="bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-4 inline-block">EVENTO 100% BENEFICO</span>
               <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Bailamos por una Causa</h3>
-              <p className="text-pink-100/80 leading-relaxed">
-                Todos los beneficios recaudados en este campeonato serán donados íntegramente a la <strong className="text-white">Associació Contra el Càncer de La Vall d'Uixó</strong>. Tu participación ayuda a la investigación y el apoyo a pacientes.
+              <p className="text-pink-100/80 leading-relaxed mb-6">
+                Desde <strong className="text-white">2015</strong>, todos los beneficios recaudados en este campeonato son donados íntegramente a la <strong className="text-white">Associació Contra el Càncer de La Vall d'Uixó</strong>.
               </p>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                  <p className="text-gray-400 text-xs uppercase tracking-wider">Recaudado 2025</p>
+                  <p className="text-2xl font-black text-[var(--primary)]">7.697€</p>
+                </div>
+                <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                  <p className="text-gray-400 text-xs uppercase tracking-wider">Total (10 años)</p>
+                  <p className="text-2xl font-black text-white">48.429€</p>
+                </div>
+              </div>
             </div>
             <div className="md:w-1/2 flex justify-center md:justify-end">
               <div className="bg-white p-4 rounded-xl shadow-lg rotate-2 hover:rotate-0 transition-transform duration-500">
