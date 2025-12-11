@@ -70,8 +70,8 @@ export default async function AccountingPage() {
                 <div className="max-w-6xl mx-auto">
                     <div className="flex justify-between items-center mb-8">
                         <div>
-                            <Link href="/" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-800 mb-2 transition-colors">
-                                <ArrowLeft size={16} className="mr-1" /> Volver al Inicio
+                            <Link href="/admin" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-800 mb-2 transition-colors">
+                                <ArrowLeft size={16} className="mr-1" /> Volver al Panel
                             </Link>
                             <h1 className="text-3xl font-bold text-slate-900">Panel de Control & Contabilidad</h1>
                         </div>
