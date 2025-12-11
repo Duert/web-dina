@@ -1,26 +1,59 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* DIT (Dance in Action) Theme */
+  --background: #000000;
+  --foreground: #ffffff;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --card: #111111;
+  --card-foreground: #ffffff;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --popover: #111111;
+  --popover-foreground: #ffffff;
+
+  --primary: #FF00CC;
+  /* Neon Pink */
+  --primary-foreground: #ffffff;
+
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ffffff;
+
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+
+  --accent: #2a2a2a;
+  --accent-foreground: #ffffff;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+
+  --border: #333333;
+  --input: #333333;
+  --ring: #FF00CC;
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
+  background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }

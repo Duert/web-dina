@@ -1,65 +1,144 @@
+"use client";
+
+import Link from "next/link";
 import Image from "next/image";
+import { Calendar, MapPin, Ticket, FileText, Camera } from "lucide-react";
+import { useState } from "react";
+import { LocationModal } from "@/components/ui/location-modal";
 
 export default function Home() {
+  const [showLocationModal, setShowLocationModal] = useState(false);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-black relative overflow-hidden">
+      {/* Background Effect with Logo */}
+      <div className="absolute inset-0 z-0 pointer-events-none select-none">
+        {/* Using Next.js Image for better optimization and reliable loading */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-30 blur-sm scale-110">
+          <Image
+            src="/logo-bg.png"
+            alt="Dance in Action Logo"
+            fill
+            className="object-contain"
+            priority
+          />
+        </div>
+        {/* Gradient Overlay to fade it out */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black"></div>
+      </div>
+
+      {/* Hero Content */}
+      <main className="relative z-10 flex flex-col items-center max-w-4xl text-center animate-in fade-in zoom-in duration-700">
+
+        {/* LOGO TITLE */}
+        <div className="mb-12">
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,0,204,0.5)]">
+            DANCE <span className="text-[var(--primary)] drop-shadow-[0_0_20px_rgba(255,0,204,0.8)]">IN</span> ACTION
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-xl md:text-2xl text-pink-200 mt-4 font-light tracking-widest uppercase opacity-90">
+            Campeonato Coreográfico de la Vall d'Uixó
+          </p>
+          <p className="text-lg md:text-xl text-pink-200 mt-2 font-light tracking-widest uppercase opacity-90">
+            1 de Marzo 2026
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-16">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-6 rounded-2xl flex flex-col items-center hover:bg-white/10 transition-colors group">
+            <Calendar className="w-8 h-8 text-[var(--primary)] mb-3 group-hover:scale-110 transition-transform" />
+            <h3 className="font-bold text-white mb-1">FECHA</h3>
+            <p className="text-gray-400">1 Marzo 2026</p>
+          </div>
+
+          {/* Center Column with Registration and Location */}
+          <div className="flex flex-col gap-4">
+            {/* Registration Button */}
+            <Link
+              href="/registration"
+              className="w-full bg-[var(--primary)] border-2 border-[var(--primary)] p-4 rounded-2xl flex items-center justify-center gap-4 hover:bg-pink-600 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(255,0,204,0.3)]"
+            >
+              <Ticket className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+              <div className="text-left">
+                <h3 className="font-black text-white text-lg leading-none">INSCRIPCIONES</h3>
+                <p className="text-pink-100 text-xs font-medium">Registra tu grupo ahora</p>
+              </div>
+            </Link>
+
+            <button
+              onClick={() => setShowLocationModal(true)}
+              className="bg-white/5 backdrop-blur-sm border border-white/10 p-6 rounded-2xl flex flex-col items-center hover:bg-white/10 hover:border-[var(--primary)]/50 transition-all group cursor-pointer"
+            >
+              <MapPin className="w-8 h-8 text-[var(--primary)] mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-bold text-white mb-1">LUGAR</h3>
+              <p className="text-gray-400 text-sm leading-tight">Auditorio Leopoldo Peñaroja<br /><span className="text-xs opacity-70">La Vall d'Uixó</span></p>
+            </button>
+          </div>
+
+          {/* Downloads Column */}
+          <div className="flex flex-col gap-4">
+            <a
+              href="/docs/bases.pdf"
+              target="_blank"
+              download
+              className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center justify-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] transition-all group"
+            >
+              <FileText className="w-6 h-6 text-pink-300 group-hover:scale-110 transition-transform" />
+              <div className="text-left">
+                <h3 className="font-bold text-white text-sm">DESCARGAR BASES</h3>
+                <p className="text-xs text-gray-400">PDF Oficial</p>
+              </div>
+            </a>
+
+            <a
+              href="/docs/autorizacion.pdf"
+              target="_blank"
+              download
+              className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center justify-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] transition-all group"
+            >
+              <Camera className="w-6 h-6 text-pink-300 group-hover:scale-110 transition-transform" />
+              <div className="text-left">
+                <h3 className="font-bold text-white text-sm">AUTORIZACIÓN IMAGEN</h3>
+                <p className="text-xs text-gray-400">Para menores</p>
+              </div>
+            </a>
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Sessions Actions */}
+        <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
+          <Link
+            href="/session/morning"
+            className="group relative px-8 py-4 bg-black/50 border-2 border-[var(--primary)] text-[var(--primary)] font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-[var(--primary)] hover:text-white hover:scale-105 w-full md:w-64 backdrop-blur-sm"
+          >
+            <div className="flex flex-col items-center">
+              <span>SESIÓN MAÑANA</span>
+              <span className="text-xs font-normal opacity-90 mt-1">10:00h</span>
+            </div>
+          </Link>
+
+
+          <Link
+            href="/session/afternoon"
+            className="group relative px-8 py-4 bg-[var(--primary)] text-white font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-pink-600 hover:scale-105 shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.6)] w-full md:w-64"
+          >
+            <div className="flex flex-col items-center">
+              <span>SESIÓN TARDE</span>
+              <span className="text-xs font-normal opacity-90 mt-1">15:30h</span>
+            </div>
+          </Link>
+        </div>
+
+        <div className="mt-20 border-t border-white/10 pt-8 w-full flex justify-center gap-8 text-sm text-gray-600">
+          <Link href="/admin" className="hover:text-white transition-colors">Acceso Organización</Link>
+          <Link href="#" className="hover:text-white transition-colors">Bases Legales</Link>
+          <Link href="#" className="hover:text-white transition-colors">Contacto</Link>
+        </div>
+
+      </main >
+
+      <LocationModal isOpen={showLocationModal} onClose={() => setShowLocationModal(false)} />
+    </div >
   );
 }
