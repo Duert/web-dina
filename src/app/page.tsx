@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Calendar, MapPin, Ticket, FileText, Camera } from "lucide-react";
+import { Calendar, MapPin, Ticket, FileText, Camera, Instagram } from "lucide-react";
 import { useState } from "react";
 import { LocationModal } from "@/components/ui/location-modal";
 
@@ -46,10 +46,26 @@ export default function Home() {
 
         {/* Info Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-16">
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-6 rounded-2xl flex flex-col items-center hover:bg-white/10 transition-colors group">
-            <Calendar className="w-8 h-8 text-[var(--primary)] mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-bold text-white mb-1">FECHA</h3>
-            <p className="text-gray-400">1 Marzo 2026</p>
+          {/* Date and Contact Column */}
+          <div className="flex flex-col gap-4">
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-6 rounded-2xl flex flex-col items-center hover:bg-white/10 transition-colors group flex-1 justify-center">
+              <Calendar className="w-8 h-8 text-[var(--primary)] mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-bold text-white mb-1">FECHA</h3>
+              <p className="text-gray-400">1 Marzo 2026</p>
+            </div>
+
+            <a
+              href="https://instagram.com/cc_danceinaction"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center justify-center gap-3 hover:bg-gradient-to-r hover:from-[#833ab4] hover:via-[#fd1d1d] hover:to-[#fcb045] hover:border-transparent transition-all group"
+            >
+              <Instagram className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
+              <div className="text-left">
+                <h3 className="font-bold text-white text-xs">CONTACTO</h3>
+                <p className="text-[10px] text-gray-400 group-hover:text-white/90">Instagram Direct</p>
+              </div>
+            </a>
           </div>
 
           {/* Center Column with Registration and Location */}
@@ -132,7 +148,6 @@ export default function Home() {
 
         <div className="mt-20 border-t border-white/10 pt-8 w-full flex justify-center gap-8 text-sm text-gray-600">
           <a href="/docs/bases.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Bases Legales</a>
-          <a href="https://instagram.com/cc_danceinaction" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto (Instagram)</a>
         </div>
 
       </main >
