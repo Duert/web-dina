@@ -122,6 +122,30 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Beneficial Cause Section */}
+        <div className="w-full mb-16 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+          <div className="bg-gradient-to-r from-pink-500/10 via-white/5 to-pink-500/10 border border-pink-500/20 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md">
+            <div className="text-left md:w-1/2">
+              <span className="bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-4 inline-block">EVENTO 100% BENEFICO</span>
+              <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Bailamos por una Causa</h3>
+              <p className="text-pink-100/80 leading-relaxed">
+                Todos los beneficios recaudados en este campeonato serán donados íntegramente a la <strong className="text-white">Associació Contra el Càncer de La Vall d'Uixó</strong>. Tu participación ayuda a la investigación y el apoyo a pacientes.
+              </p>
+            </div>
+            <div className="md:w-1/2 flex justify-center md:justify-end">
+              <div className="bg-white p-4 rounded-xl shadow-lg rotate-2 hover:rotate-0 transition-transform duration-500">
+                <Image
+                  src="/logo-cancer-vall.png"
+                  alt="Associació Contra el Càncer La Vall"
+                  width={200}
+                  height={80}
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Sessions Actions */}
         <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
           <Link
