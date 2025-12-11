@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Lock, LayoutDashboard, Users, FileText, X, Download, Eye, Ticket, Calendar, Search, Check, Clock } from "lucide-react";
+import { Lock, LayoutDashboard, Users, FileText, X, Download, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { resetApplicationData } from "@/app/actions-admin";
 import { Registration } from "@/types";
 
 // Extended interface for fetching
@@ -21,8 +22,9 @@ export default function AdminPage() {
     // Data State
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState<'registrations' | 'sales'>('registrations');
+    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'settings'>('registrations');
     const [publicSalesEnabled, setPublicSalesEnabled] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
 
     // --- Authentication ---
 
@@ -98,6 +100,23 @@ export default function AdminPage() {
             setSelectedRegistration(data);
         } catch (err) {
             console.error("Error fetching details:", err);
+        }
+    };
+    const handleResetData = async () => {
+        if (confirm("⚠️ ¡PELIGRO! ⚠️\n\n¿Estás SEGURO de que quieres borrar TODOS los datos?\n\nEsto eliminará permanentemente:\n- Todos los pedidos y pagos\n- Todas las inscripciones\n- Liberará todas las butacas\n\nEsta acción NO se puede deshacer.")) {
+            if (confirm("Última confirmación: ¿De verdad quieres empezar de cero?")) {
+                setIsResetting(true);
+                try {
+                    await resetApplicationData();
+                    alert("✅ Datos restablecidos correctamente.");
+                    // Refresh local state
+                    fetchRegistrations();
+                } catch (e: any) {
+                    alert("❌ Error al restablecer datos: " + e.message);
+                } finally {
+                    setIsResetting(false);
+                }
+            }
         }
     };
 
@@ -182,7 +201,6 @@ export default function AdminPage() {
 
             <main className="max-w-7xl mx-auto p-4 md:p-8">
 
-                {/* Tabs */}
                 <div className="flex gap-4 mb-8 border-b border-white/10">
                     <button
                         onClick={() => setActiveTab('registrations')}
@@ -197,6 +215,13 @@ export default function AdminPage() {
                     >
                         Ventas de Entradas
                         {activeTab === 'sales' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'settings' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Configuración
+                        {activeTab === 'settings' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
                     </button>
                 </div>
 
@@ -332,6 +357,33 @@ export default function AdminPage() {
                         <Ticket className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                         <h3 className="text-xl font-bold text-gray-400 mb-2">Próximamente</h3>
                         <p className="text-gray-500">El módulo de ventas de entradas estará disponible pronto.</p>
+                    </div>
+                )}
+
+                {activeTab === 'settings' && (
+                    <div className="max-w-2xl mx-auto space-y-8">
+                        <div className="bg-red-900/10 border border-red-500/20 p-6 rounded-2xl">
+                            <h3 className="text-red-500 font-bold text-xl flex items-center gap-2 mb-4">
+                                <AlertTriangle /> Zona de Peligro
+                            </h3>
+                            <p className="text-gray-400 mb-6 text-sm">
+                                Estas acciones son destructivas y no se pueden deshacer. Ten cuidado.
+                            </p>
+
+                            <div className="bg-black/30 p-4 rounded-xl border border-red-500/10 flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-bold text-white">Restablecer Aplicación</h4>
+                                    <p className="text-xs text-gray-500 mt-1">Borra todos los pedidos, inscripciones y libera butacas.</p>
+                                </div>
+                                <button
+                                    onClick={handleResetData}
+                                    disabled={isResetting}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isResetting ? 'Borrando...' : 'Borrar Todos los Datos'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>
