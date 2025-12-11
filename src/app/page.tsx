@@ -3,11 +3,31 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Calendar, MapPin, Ticket, FileText, Camera, Instagram } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LocationModal } from "@/components/ui/location-modal";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [salesOpen, setSalesOpen] = useState(false);
+
+  // Fetch 'app_settings' locally to decide if sales are open
+  useEffect(() => {
+    const fetchSettings = async () => {
+      // Use supabase client
+      // We assume public_sales_enabled is in table 'app_settings', row id=1
+      const { data } = await supabase
+        .from('app_settings')
+        .select('public_sales_enabled')
+        .eq('id', 1)
+        .single();
+
+      if (data) {
+        setSalesOpen(data.public_sales_enabled);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-black relative overflow-hidden">
@@ -165,11 +185,10 @@ export default function Home() {
           </h2>
           <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
             {/* 
-              Toggle this via Vercel Environment Variables:
-              NEXT_PUBLIC_SALES_OPEN="true" to show buttons
-              NEXT_PUBLIC_SALES_OPEN="false" (or missing) to show message
+              Controlled by 'app_settings' table in Supabase.
+              Toggle via Admin Panel > Configuración header button.
             */}
-            {process.env.NEXT_PUBLIC_SALES_OPEN === 'true' ? (
+            {salesOpen ? (
               <>
                 <Link
                   href="/session/morning"
