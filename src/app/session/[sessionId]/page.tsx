@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { initialSeats } from "@/lib/data";
 import SessionBooking from "@/components/session-booking";
 import { notFound } from "next/navigation";
@@ -10,6 +10,12 @@ export const dynamic = 'force-dynamic'; // Ensure we always fetch fresh data
 
 export default async function SessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
     const { sessionId } = await params;
+
+    // Create a fresh client for this request to avoid caching issues
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     // 1. Fetch Session Info
     const { data: sessionData, error: sessionError } = await supabase
