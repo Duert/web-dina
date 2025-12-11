@@ -232,12 +232,24 @@ export default async function AccountingPage() {
                 </div>
             </div>
         );
+    } catch (error: any) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 p-8">
+                <div className="bg-white p-8 rounded-xl shadow-lg border border-red-100 max-w-lg text-center">
+                    <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-slate-900 mb-2">Error cargando Contabilidad</h2>
+                    <p className="text-slate-500 mb-4">{error.message || "Error desconocido"}</p>
+                    <Link href="/admin" className="text-blue-600 hover:underline">Volver al Admin</Link>
+                </div>
+            </div>
+        );
     }
+}
 
 function StatusBadge({ status }: { status: string }) {
-        if (status === 'paid') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800"><CheckCircle size={12} /> Pagado</span>;
-        if (status === 'pending') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800"><Clock size={12} /> Pendiente</span>;
-        if (status === 'cancelled') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800"><XCircle size={12} /> Cancelado</span>;
-        if (status === 'expired') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"><Trash2 size={12} /> Caducado</span>;
-        return <span className="text-gray-500">{status}</span>;
-    }
+    if (status === 'paid') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800"><CheckCircle size={12} /> Pagado</span>;
+    if (status === 'pending') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800"><Clock size={12} /> Pendiente</span>;
+    if (status === 'cancelled') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800"><XCircle size={12} /> Cancelado</span>;
+    if (status === 'expired') return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"><Trash2 size={12} /> Caducado</span>;
+    return <span className="text-gray-500">{status}</span>;
+}
