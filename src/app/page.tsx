@@ -131,7 +131,7 @@ export default function Home() {
         </div>
 
         <div className="mt-20 border-t border-white/10 pt-8 w-full flex justify-center gap-8 text-sm text-gray-600">
-          <Link href="#" className="hover:text-white transition-colors">Bases Legales</Link>
+          <a href="/docs/bases.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Bases Legales</a>
           <a href="https://instagram.com/cc_danceinaction" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto (Instagram)</a>
         </div>
 
