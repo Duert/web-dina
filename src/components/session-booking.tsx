@@ -85,7 +85,16 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
                         <ArrowLeft size={16} className="mr-1" /> Volver
                     </Link>
                     <h1 className="text-2xl font-bold text-slate-900">{session.name}</h1>
-                    <p className="text-slate-500 text-sm">{new Date(session.date).toLocaleString()}</p>
+                    <p className="text-slate-500 text-sm capitalize">
+                        {new Date(session.date).toLocaleDateString('es-ES', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}h
+                    </p>
                 </div>
 
                 {/* SUCCESS SCREEN */}
