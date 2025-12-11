@@ -160,8 +160,8 @@ export default function Home() {
 
         {/* Sessions Actions */}
         <div className="w-full flex flex-col items-center gap-8">
-          <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-            ENTRADAS
+          <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] text-center uppercase">
+            COMPRA TUS ENTRADAS AQUÍ
           </h2>
           <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
             <Link
