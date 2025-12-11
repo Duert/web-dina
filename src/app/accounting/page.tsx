@@ -1,26 +1,59 @@
 import { supabase } from "@/lib/supabase";
 import { confirmOrderPayment, cancelOrder, cleanupExpiredOrders } from "@/app/actions";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, XCircle, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Clock, Trash2, Users } from "lucide-react";
 import ExportButton from "@/components/export-button";
+import { AdminSeatMapModal } from "@/components/admin-seat-map-modal";
+import { initialSeats } from "@/lib/data";
+import { Seat } from "@/types";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AccountingPage() {
     // Fetch all orders
-    const { data: orders, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+    // Fetch all data in parallel
+    const [ordersResult, ticketsResult] = await Promise.all([
+        supabase.from('orders').select('*').order('created_at', { ascending: false }),
+        supabase.from('tickets').select('*')
+    ]);
+
+    const orders = ordersResult.data;
+    const tickets = ticketsResult.data;
+    const error = ordersResult.error || ticketsResult.error;
 
     if (error) {
         return <div>Error loading orders: {error.message}</div>;
     }
 
-    // Calculations
+    // Order Calculations
     const totalRevenue = orders?.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0) || 0;
     const pendingRevenue = orders?.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + o.total_amount, 0) || 0;
     const totalOrders = orders?.filter(o => o.payment_status === 'paid' || o.payment_status === 'pending').length || 0;
+
+    // Session Calculations
+    const processSession = (sessionId: string) => {
+        const sessionTickets = tickets?.filter(t => t.session_id === sessionId) || [];
+
+        // Map Status
+        const ticketMap = new Map();
+        sessionTickets.forEach(t => ticketMap.set(t.seat_id, t.status));
+
+        const seats: Seat[] = initialSeats.map(seat => ({
+            ...seat,
+            status: ticketMap.get(seat.id) || 'available'
+        }));
+
+        const soldCount = sessionTickets.filter(t => t.status === 'sold').length;
+        // Calculate revenue from sold tickets only
+        const revenue = sessionTickets
+            .filter(t => t.status === 'sold')
+            .reduce((sum, t) => sum + (t.price || 0), 0);
+
+        return { seats, soldCount, revenue };
+    };
+
+    const morningStats = processSession('morning');
+    const afternoonStats = processSession('afternoon');
 
     return (
         <div className="min-h-screen bg-slate-50 p-8">
@@ -61,6 +94,63 @@ export default async function AccountingPage() {
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h3 className="text-slate-500 text-sm font-semibold uppercase">Total Reservas</h3>
                         <p className="text-3xl font-bold text-slate-900 mt-2">{totalOrders}</p>
+                    </div>
+                </div>
+
+                {/* Session Occupancy & Maps */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* Morning Session */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <h3 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
+                                <Users className="text-blue-500" />
+                                Sesión Mañana
+                            </h3>
+                            <div className="mt-4 flex justify-between items-end border-b pb-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 uppercase font-bold">Butacas Vendidas</p>
+                                    <p className="text-4xl font-black text-slate-900 mt-1">
+                                        {morningStats.soldCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
+                                    <p className="text-xl font-bold text-green-600">{morningStats.revenue}€</p>
+                                </div>
+                            </div>
+                        </div>
+                        <AdminSeatMapModal
+                            sessionName="Sesión Mañana (10:00h)"
+                            seats={morningStats.seats}
+                            stats={{ sold: morningStats.soldCount, total: initialSeats.length, revenue: morningStats.revenue }}
+                        />
+                    </div>
+
+                    {/* Afternoon Session */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <h3 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
+                                <Users className="text-pink-500" />
+                                Sesión Tarde
+                            </h3>
+                            <div className="mt-4 flex justify-between items-end border-b pb-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 uppercase font-bold">Butacas Vendidas</p>
+                                    <p className="text-4xl font-black text-slate-900 mt-1">
+                                        {afternoonStats.soldCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
+                                    <p className="text-xl font-bold text-green-600">{afternoonStats.revenue}€</p>
+                                </div>
+                            </div>
+                        </div>
+                        <AdminSeatMapModal
+                            sessionName="Sesión Tarde (15:30h)"
+                            seats={afternoonStats.seats}
+                            stats={{ sold: afternoonStats.soldCount, total: initialSeats.length, revenue: afternoonStats.revenue }}
+                        />
                     </div>
                 </div>
 

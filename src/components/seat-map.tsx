@@ -7,8 +7,9 @@ import { Check, User, Ban } from "lucide-react";
 
 interface SeatMapProps {
     seats: Seat[];
-    selectedSeats: Seat[];
-    onSeatToggle: (seat: Seat, e: React.MouseEvent) => void;
+    selectedSeats?: Seat[];
+    onSeatToggle?: (seat: Seat, e: React.MouseEvent) => void;
+    readonly?: boolean;
 }
 
 const ZONE_STYLES: Record<Zone, string> = {
@@ -25,7 +26,7 @@ const STATUS_STYLES = {
     blocked: "bg-red-200 border-2 border-red-400 text-red-700 cursor-not-allowed",
 };
 
-export function SeatMap({ seats, selectedSeats, onSeatToggle }: SeatMapProps) {
+export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = false }: SeatMapProps) {
     const [scale, setScale] = useState(0.6); // Start at 60% as requested
 
     const rows = useMemo(() => {
@@ -84,7 +85,7 @@ export function SeatMap({ seats, selectedSeats, onSeatToggle }: SeatMapProps) {
                                     {/* 1. LEFT OUTER BLOCK (Seats > 22) */}
                                     <div className="flex justify-end gap-0.5 w-[280px] shrink-0">
                                         {leftOuter.map(seat => (
-                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} />
+                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} readonly={readonly} />
                                         ))}
                                     </div>
 
@@ -94,7 +95,7 @@ export function SeatMap({ seats, selectedSeats, onSeatToggle }: SeatMapProps) {
                                     {/* 2. LEFT INNER BLOCK (Seats <= 21) */}
                                     <div className="flex justify-end gap-0.5 w-[310px] shrink-0">
                                         {leftInner.map(seat => (
-                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} />
+                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} readonly={readonly} />
                                         ))}
                                     </div>
 
@@ -110,7 +111,7 @@ export function SeatMap({ seats, selectedSeats, onSeatToggle }: SeatMapProps) {
                                     {/* 3. RIGHT INNER BLOCK (Seats <= 22) */}
                                     <div className="flex justify-start gap-0.5 w-[310px] shrink-0">
                                         {rightInner.map(seat => (
-                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} />
+                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} readonly={readonly} />
                                         ))}
                                     </div>
 
@@ -120,7 +121,7 @@ export function SeatMap({ seats, selectedSeats, onSeatToggle }: SeatMapProps) {
                                     {/* 4. RIGHT OUTER BLOCK (Seats > 22) */}
                                     <div className="flex justify-start gap-0.5 w-[280px] shrink-0">
                                         {rightOuter.map(seat => (
-                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} />
+                                            <SeatButton key={seat.id} seat={seat} selected={isSelected(seat)} onSeatToggle={onSeatToggle} readonly={readonly} />
                                         ))}
                                     </div>
 
@@ -160,12 +161,12 @@ function settingsForSeat(seat: Seat, selected: boolean) {
     return ZONE_STYLES[seat.zone];
 }
 
-function SeatButton({ seat, selected, onSeatToggle }: { seat: Seat, selected: boolean, onSeatToggle: (s: Seat, e: React.MouseEvent) => void }) {
+function SeatButton({ seat, selected, onSeatToggle, readonly }: { seat: Seat, selected: boolean, onSeatToggle?: (s: Seat, e: React.MouseEvent) => void, readonly: boolean }) {
     const isSold = seat.status === 'sold';
     return (
         <button
-            disabled={seat.status !== 'available'}
-            onClick={(e) => onSeatToggle(seat, e)}
+            disabled={seat.status !== 'available' || readonly}
+            onClick={(e) => !readonly && onSeatToggle && onSeatToggle(seat, e)}
             title={`${seat.zone} - Fila ${seat.row} | Asiento ${seat.number}`}
             className={cn(
                 "w-6 h-6 flex items-center justify-center text-[9px] font-bold transition-all duration-200 rounded-[2px] shrink-0 select-none",
