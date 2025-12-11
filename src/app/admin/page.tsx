@@ -117,12 +117,16 @@ export default function AdminPage() {
             if (confirm("Última confirmación: ¿De verdad quieres empezar de cero?")) {
                 setIsResetting(true);
                 try {
-                    await resetApplicationData();
-                    alert("✅ Datos restablecidos correctamente.");
-                    // Refresh local state
-                    fetchRegistrations();
+                    const result = await resetApplicationData();
+                    if (result.success) {
+                        alert("✅ Datos restablecidos correctamente.");
+                        // Refresh local state
+                        fetchRegistrations();
+                    } else {
+                        alert("❌ Error: " + result.error);
+                    }
                 } catch (e: any) {
-                    alert("❌ Error al restablecer datos: " + e.message);
+                    alert("❌ Error de conexión: " + e.message);
                 } finally {
                     setIsResetting(false);
                 }
