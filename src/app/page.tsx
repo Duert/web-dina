@@ -159,27 +159,32 @@ export default function Home() {
         </div>
 
         {/* Sessions Actions */}
-        <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
-          <Link
-            href="/session/morning"
-            className="group relative px-8 py-4 bg-black/50 border-2 border-[var(--primary)] text-[var(--primary)] font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-[var(--primary)] hover:text-white hover:scale-105 w-full md:w-64 backdrop-blur-sm"
-          >
-            <div className="flex flex-col items-center">
-              <span>SESIÓN MAÑANA</span>
-              <span className="text-xs font-normal opacity-90 mt-1">10:00h</span>
-            </div>
-          </Link>
+        <div className="w-full flex flex-col items-center gap-8">
+          <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+            ENTRADAS
+          </h2>
+          <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
+            <Link
+              href="/session/morning"
+              className="group relative px-8 py-4 bg-black/50 border-2 border-[var(--primary)] text-[var(--primary)] font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-[var(--primary)] hover:text-white hover:scale-105 w-full md:w-64 backdrop-blur-sm"
+            >
+              <div className="flex flex-col items-center">
+                <span>SESIÓN MAÑANA</span>
+                <span className="text-xs font-normal opacity-90 mt-1">10:00h</span>
+              </div>
+            </Link>
 
 
-          <Link
-            href="/session/afternoon"
-            className="group relative px-8 py-4 bg-[var(--primary)] text-white font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-pink-600 hover:scale-105 shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.6)] w-full md:w-64"
-          >
-            <div className="flex flex-col items-center">
-              <span>SESIÓN TARDE</span>
-              <span className="text-xs font-normal opacity-90 mt-1">15:30h</span>
-            </div>
-          </Link>
+            <Link
+              href="/session/afternoon"
+              className="group relative px-8 py-4 bg-[var(--primary)] text-white font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-pink-600 hover:scale-105 shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.6)] w-full md:w-64"
+            >
+              <div className="flex flex-col items-center">
+                <span>SESIÓN TARDE</span>
+                <span className="text-xs font-normal opacity-90 mt-1">15:30h</span>
+              </div>
+            </Link>
+          </div>
         </div>
 
 
