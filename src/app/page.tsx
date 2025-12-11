@@ -164,26 +164,41 @@ export default function Home() {
             COMPRA TUS ENTRADAS AQUÍ
           </h2>
           <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
-            <Link
-              href="/session/morning"
-              className="group relative px-8 py-4 bg-black/50 border-2 border-[var(--primary)] text-[var(--primary)] font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-[var(--primary)] hover:text-white hover:scale-105 w-full md:w-64 backdrop-blur-sm"
-            >
-              <div className="flex flex-col items-center">
-                <span>SESIÓN MAÑANA</span>
-                <span className="text-xs font-normal opacity-90 mt-1">10:00h</span>
-              </div>
-            </Link>
+            {/* 
+              Toggle this via Vercel Environment Variables:
+              NEXT_PUBLIC_SALES_OPEN="true" to show buttons
+              NEXT_PUBLIC_SALES_OPEN="false" (or missing) to show message
+            */}
+            {process.env.NEXT_PUBLIC_SALES_OPEN === 'true' ? (
+              <>
+                <Link
+                  href="/session/morning"
+                  className="group relative px-8 py-4 bg-black/50 border-2 border-[var(--primary)] text-[var(--primary)] font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-[var(--primary)] hover:text-white hover:scale-105 w-full md:w-64 backdrop-blur-sm"
+                >
+                  <div className="flex flex-col items-center">
+                    <span>SESIÓN MAÑANA</span>
+                    <span className="text-xs font-normal opacity-90 mt-1">10:00h</span>
+                  </div>
+                </Link>
 
-
-            <Link
-              href="/session/afternoon"
-              className="group relative px-8 py-4 bg-[var(--primary)] text-white font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-pink-600 hover:scale-105 shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.6)] w-full md:w-64"
-            >
-              <div className="flex flex-col items-center">
-                <span>SESIÓN TARDE</span>
-                <span className="text-xs font-normal opacity-90 mt-1">15:30h</span>
+                <Link
+                  href="/session/afternoon"
+                  className="group relative px-8 py-4 bg-[var(--primary)] text-white font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-pink-600 hover:scale-105 shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.6)] w-full md:w-64"
+                >
+                  <div className="flex flex-col items-center">
+                    <span>SESIÓN TARDE</span>
+                    <span className="text-xs font-normal opacity-90 mt-1">15:30h</span>
+                  </div>
+                </Link>
+              </>
+            ) : (
+              <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-8 rounded-2xl max-w-2xl text-center">
+                <p className="text-xl md:text-2xl text-pink-200 font-medium leading-relaxed">
+                  Cuando abramos la taquilla virtual...
+                  <span className="block text-white font-bold mt-2">Podrás comprar aquí tus entradas</span>
+                </p>
               </div>
-            </Link>
+            )}
           </div>
         </div>
 
