@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Lock, LayoutDashboard, Users, FileText, X, Download, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle } from "lucide-react";
+import { Lock, LayoutDashboard, Users, FileText, X, Download, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { resetApplicationData } from "@/app/actions-admin";
+import { resetApplicationData, deleteRegistration } from "@/app/actions-admin";
 import { Registration } from "@/types";
 import dynamic from "next/dynamic";
 import { RegistrationDocument } from "@/components/pdf/RegistrationDocument";
@@ -439,6 +439,26 @@ export default function AdminPage() {
                                 >
                                     <Ticket size={16} /> Asignar Asientos
                                 </Link>
+
+                                <button
+                                    onClick={async () => {
+                                        if (confirm("¿Estás seguro de que quieres BORRAR esta inscripción? Se liberarán todos sus asientos asignados.")) {
+                                            const res = await deleteRegistration(selectedRegistration.id);
+                                            if (res.success) {
+                                                alert("Inscripción borrada y asientos liberados.");
+                                                setSelectedRegistration(null);
+                                                fetchRegistrations();
+                                            } else {
+                                                alert("Error: " + res.error);
+                                            }
+                                        }
+                                    }}
+                                    className="bg-red-500/20 hover:bg-red-500/40 text-red-500 hover:text-red-200 p-2 rounded-lg transition-colors"
+                                    title="Borrar Inscripción"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+
                                 <button
                                     onClick={() => setSelectedRegistration(null)}
                                     className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"

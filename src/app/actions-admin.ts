@@ -65,3 +65,52 @@ export async function resetApplicationData() {
         return { success: false, error: "Error inesperado: " + e.message };
     }
 }
+
+export async function deleteRegistration(registrationId: string) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseServiceKey) {
+        return { success: false, error: "Falta SUPABASE_SERVICE_ROLE_KEY" };
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    try {
+        // 1. Release Tickets first
+        const { error: ticketError } = await supabaseAdmin
+            .from('tickets')
+            .update({
+                status: 'available',
+                registration_id: null,
+                holder_name: null,
+                order_id: null,
+                sold_at: null
+            })
+            .eq('registration_id', registrationId);
+
+        if (ticketError) {
+            console.error("Error releasing tickets:", ticketError);
+            return { success: false, error: "Error liberando tickets: " + ticketError.message };
+        }
+
+        // 2. Delete Registration (Cascade should handle children like participants, but we do it safely)
+        const { error: deleteError } = await supabaseAdmin
+            .from('registrations')
+            .delete()
+            .eq('id', registrationId);
+
+        if (deleteError) {
+            console.error("Error deleting registration:", deleteError);
+            return { success: false, error: "Error borrando inscripción: " + deleteError.message };
+        }
+
+        revalidatePath('/admin');
+        revalidatePath('/accounting');
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
