@@ -46,7 +46,7 @@ export async function sendRegistrationEmail(registrationId: string) {
         // 3. Send Email
         const { data, error: emailError } = await resend.emails.send({
             from: 'Dance In Action <onboarding@resend.dev>', // Update this if user has a domain
-            to: ['domingojoselol@gmail.com'], // Default to user's email or configurable env var
+            to: [process.env.ADMIN_EMAIL || 'domingojoselol@gmail.com'], // Configurable via environment variable
             subject: subject,
             html: htmlContent,
         });
