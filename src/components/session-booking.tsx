@@ -124,7 +124,7 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
                     </div>
                 ) : showCheckout ? (
                     /* CHECKOUT FORM */
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col p-6 animate-in slide-in-from-right">
+                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col p-6 animate-in slide-in-from-right overflow-y-auto">
                         <h2 className="font-bold text-lg mb-4">Tus Datos</h2>
                         <div className="space-y-4 flex-1">
                             <div>
