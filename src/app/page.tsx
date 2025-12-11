@@ -132,7 +132,7 @@ export default function Home() {
 
         <div className="mt-20 border-t border-white/10 pt-8 w-full flex justify-center gap-8 text-sm text-gray-600">
           <Link href="#" className="hover:text-white transition-colors">Bases Legales</Link>
-          <Link href="#" className="hover:text-white transition-colors">Contacto</Link>
+          <a href="https://instagram.com/danceinaction_oficial" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto (Instagram)</a>
         </div>
 
       </main >
