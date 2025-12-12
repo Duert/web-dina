@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Trash2, Upload, Plus, Save, Loader2 } from "lucide-react";
+import { Trash2, Upload, Plus, Save, Loader2, Eye, EyeOff } from "lucide-react";
 
 // Types
 type Judge = {
@@ -12,6 +12,7 @@ type Judge = {
     bio: string;
     image_url: string;
     display_order: number;
+    visible: boolean;
 };
 
 export default function AdminJudgesManager() {
@@ -79,7 +80,8 @@ export default function AdminJudgesManager() {
                 role: currentJudge.role,
                 bio: currentJudge.bio || '',
                 image_url: imageUrl,
-                display_order: currentJudge.display_order || judges.length + 1
+                display_order: currentJudge.display_order || judges.length + 1,
+                visible: currentJudge.visible ?? false // Default to hidden (draft)
             };
 
             if (currentJudge.id) {
@@ -222,7 +224,7 @@ export default function AdminJudgesManager() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre</label>
                                 <input
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white"
                                     value={currentJudge.name || ''}
                                     onChange={e => setCurrentJudge({ ...currentJudge, name: e.target.value })}
                                     placeholder="Ej. Lola Índigo"
@@ -232,7 +234,7 @@ export default function AdminJudgesManager() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Rol / Título</label>
                                 <input
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white"
                                     value={currentJudge.role || ''}
                                     onChange={e => setCurrentJudge({ ...currentJudge, role: e.target.value })}
                                     placeholder="Ej. Coreógrafa & Bailarina"
@@ -242,7 +244,7 @@ export default function AdminJudgesManager() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Biografía (Opcional)</label>
                                 <textarea
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 text-sm"
+                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 text-sm text-slate-900 bg-white"
                                     value={currentJudge.bio || ''}
                                     onChange={e => setCurrentJudge({ ...currentJudge, bio: e.target.value })}
                                     placeholder="Breve descripción de su trayectoria..."
