@@ -232,18 +232,18 @@ export default function AdminPage() {
                         {activeTab === 'sales' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
                     </button>
                     <button
-                        onClick={() => setActiveTab('config')}
-                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'config' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Configuración
-                        {activeTab === 'config' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
-                    </button>
-                    <button
                         onClick={() => setActiveTab('judges')}
                         className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'judges' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
                     >
                         Jurado
                         {activeTab === 'judges' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('config')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'config' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Configuración
+                        {activeTab === 'config' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
                     </button>
                 </div>
 
