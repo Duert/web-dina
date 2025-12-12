@@ -113,6 +113,26 @@ export default function AdminJudgesManager() {
         }
     };
 
+    const toggleVisibility = async (judge: Judge) => {
+        try {
+            const newStatus = !judge.visible;
+            // Optimistic update
+            setJudges(judges.map(j => j.id === judge.id ? { ...j, visible: newStatus } : j));
+
+            const { error } = await supabase
+                .from('judges')
+                .update({ visible: newStatus })
+                .eq('id', judge.id);
+
+            if (error) {
+                throw error;
+            }
+        } catch (error: any) {
+            alert("Error actualizando visibilidad: " + error.message);
+            fetchJudges(); // Revert on error
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (!confirm("¿Seguro que quieres borrar este jurado?")) return;
 
