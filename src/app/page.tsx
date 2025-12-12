@@ -31,21 +31,23 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-black relative overflow-hidden">
-      {/* Background Effect with Logo */}
+      {/* Background Effect with Video */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none">
-        {/* Using Next.js Image for better optimization and reliable loading */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-30 blur-sm scale-110">
-          <Image
-            src="/logo-bg.png"
-            alt="Dance in Action Logo"
-            fill
-            className="object-contain"
-            priority
-          />
-        </div>
-        {/* Gradient Overlay to fade it out */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black"></div>
+
+        {/* Video Background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover scale-105"
+        >
+          <source src="/video.mp4" type="video/mp4" />
+        </video>
+
+        {/* Gradient Overlay for Text Readability */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40"></div>
       </div>
 
       {/* Hero Content */}
@@ -54,7 +56,7 @@ export default function Home() {
         {/* LOGO TITLE */}
         <div className="mb-12">
           <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,0,204,0.5)]">
-            DANCE <span className="text-[var(--primary)] drop-shadow-[0_0_20px_rgba(255,0,204,0.8)]">IN</span> ACTION
+            Dance <span className="text-[var(--primary)] drop-shadow-[0_0_20px_rgba(255,0,204,0.8)]">IN</span> Action
           </h1>
           <p className="text-xl md:text-2xl text-pink-200 mt-4 font-light tracking-widest uppercase opacity-90">
             Campeonato Coreográfico de la Vall d'Uixó
