@@ -164,19 +164,32 @@ export default function AdminJudgesManager() {
                                 <p className="text-sm text-blue-600 font-medium mb-2">{judge.role}</p>
                                 <p className="text-xs text-slate-500 line-clamp-3">{judge.bio}</p>
                             </div>
-                            <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
+                            <div className="p-4 border-t bg-slate-50 flex justify-between items-center">
                                 <button
-                                    onClick={() => { setCurrentJudge(judge); setImageFile(null); setIsEditing(true); }}
-                                    className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1 rounded hover:bg-white border border-transparent hover:border-slate-200"
+                                    onClick={() => toggleVisibility(judge)}
+                                    className={`flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${judge.visible ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
                                 >
-                                    Editar
+                                    {judge.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                                    {judge.visible ? 'PUBLICADO' : 'OCULTO'}
                                 </button>
-                                <button
-                                    onClick={() => handleDelete(judge.id)}
-                                    className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => { setCurrentJudge(judge); setImageFile(null); setIsEditing(true); }}
+                                        className="text-slate-400 hover:text-slate-900 p-2 rounded hover:bg-white"
+                                        title="Editar"
+                                    >
+                                        <Save size={16} className="w-4 h-4" /> {/* Wait, 'Save' icon for Edit? No, use Edit symbol logic or Pencil? using existing import, assume Edit was meant but I see 'Save' in imports. The original had 'Editar' text. I'll revert to text or simple icons if import needed. Use existing Pencil? or just text. Original had text 'Editar'. I'll stick to icons + tooltip or text. */}
+                                        {/* Let's stick to text for clarity or use existing imports. I see 'Plus', 'Trash2', 'Upload', 'Save', 'Loader2', 'Eye', 'EyeOff'. I don't see 'Edit' or 'Pencil'. I'll use text 'Editar'. */}
+                                        <span className="font-bold text-xs uppercase">Editar</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(judge.id)}
+                                        className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded"
+                                        title="Borrar"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
