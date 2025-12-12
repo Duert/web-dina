@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Lock, LayoutDashboard, Users, FileText, X, Download, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, Building, Download, RefreshCw, Trash2, Gavel, Lock, LayoutDashboard, FileText, X, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { resetApplicationData, deleteRegistration } from "@/app/actions-admin";
+import { deleteRegistration, resetApplicationData } from "@/app/actions-admin";
+import AdminJudgesManager from "@/components/admin-judges-manager";
 import { Registration } from "@/types";
 import dynamic from "next/dynamic";
 import { RegistrationDocument } from "@/components/pdf/RegistrationDocument";

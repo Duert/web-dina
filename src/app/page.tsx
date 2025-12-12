@@ -6,6 +6,7 @@ import { Calendar, MapPin, Ticket, FileText, Camera, Instagram } from "lucide-re
 import { useState, useEffect } from "react";
 import { LocationModal } from "@/components/ui/location-modal";
 import { supabase } from "@/lib/supabase";
+import JudgesSection from "@/components/judges-section";
 
 export default function Home() {
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -142,6 +143,11 @@ export default function Home() {
               </div>
             </a>
           </div>
+        </div>
+
+        {/* JUDGES SECTION */}
+        <div className="w-full mb-16">
+          <JudgesSection />
         </div>
 
         {/* Beneficial Cause Section */}
