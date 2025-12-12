@@ -33,7 +33,7 @@ export default function AdminPage() {
     // Data State
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'settings'>('registrations');
+    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'config' | 'judges'>('registrations');
     const [publicSalesEnabled, setPublicSalesEnabled] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
 
@@ -232,11 +232,18 @@ export default function AdminPage() {
                         {activeTab === 'sales' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
                     </button>
                     <button
-                        onClick={() => setActiveTab('settings')}
-                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'settings' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setActiveTab('config')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'config' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
                     >
                         Configuración
-                        {activeTab === 'settings' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
+                        {activeTab === 'config' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('judges')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'judges' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Jurado
+                        {activeTab === 'judges' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
                     </button>
                 </div>
 
@@ -367,6 +374,8 @@ export default function AdminPage() {
                             </div>
                         )}
                     </div>
+                ) : activeTab === 'judges' ? (
+                    <AdminJudgesManager />
                 ) : (
                     <div className="text-center py-20 bg-white/5 rounded-2xl border border-dashed border-white/10">
                         <Ticket className="w-12 h-12 text-gray-600 mx-auto mb-4" />
@@ -375,7 +384,7 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                {activeTab === 'settings' && (
+                {activeTab === 'config' && (
                     <div className="max-w-2xl mx-auto space-y-8">
                         <div className="bg-red-900/10 border border-red-500/20 p-6 rounded-2xl">
                             <h3 className="text-red-500 font-bold text-xl flex items-center gap-2 mb-4">
