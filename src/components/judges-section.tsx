@@ -1,17 +1,41 @@
-import { createClient } from "@supabase/supabase-js";
-import { User } from "lucide-react";
+"use client";
 
-// Server Component
-export default async function JudgesSection() {
+import { createClient } from "@supabase/supabase-js";
+import { User, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+
+// Client Component
+export default function JudgesSection() {
+    const [judges, setJudges] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
     const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const { data: judges } = await supabase
-        .from('judges')
-        .select('*')
-        .order('display_order', { ascending: true });
+    useEffect(() => {
+        const fetchJudges = async () => {
+            const { data } = await supabase
+                .from('judges')
+                .select('*')
+                .eq('visible', true)
+                .order('display_order', { ascending: true });
+
+            if (data) setJudges(data);
+            setLoading(false);
+        };
+
+        fetchJudges();
+    }, []);
+
+    if (loading) {
+        return (
+            <section className="w-full py-20 bg-neutral-950 relative overflow-hidden flex justify-center items-center">
+                <Loader2 className="animate-spin text-pink-500 w-8 h-8" />
+            </section>
+        );
+    }
 
     return (
         <section className="w-full py-20 bg-neutral-950 relative overflow-hidden">
