@@ -56,7 +56,7 @@ export default function Home() {
 
         {/* LOGO TITLE */}
         <div className="mb-12">
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,0,204,0.5)]">
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,0,204,0.5)] uppercase">
             Dance <span className="text-[var(--primary)] drop-shadow-[0_0_20px_rgba(255,0,204,0.8)]">IN</span> Action
           </h1>
           <p className="text-xl md:text-2xl text-pink-200 mt-4 font-light tracking-widest uppercase opacity-90">
