@@ -52,7 +52,7 @@ function RegistrationForm() {
     const [musicFile, setMusicFile] = useState<File | null>(null);
     const [participantAuthFiles, setParticipantAuthFiles] = useState<{ [key: number]: File }>({});
     const [participantDniFiles, setParticipantDniFiles] = useState<{ [key: number]: File }>({});
-    const [responsibleDniFiles, setResponsibleDniFiles] = useState<{ [key: number]: File }>({});
+    const [responsibleDniFiles, setResponsibleDniFiles] = useState<{ [key: number]: File[] }>({}); // Changed to File[]
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -178,8 +178,20 @@ function RegistrationForm() {
         setParticipantDniFiles(prev => ({ ...prev, [index]: file }));
     };
 
-    const handleResponsibleDniFileChange = (index: number, file: File) => {
-        setResponsibleDniFiles(prev => ({ ...prev, [index]: file }));
+    const handleResponsibleDniFileChange = (index: number, newFiles: FileList | null) => {
+        if (!newFiles) return;
+        setResponsibleDniFiles(prev => {
+            const existing = prev[index] || [];
+            return { ...prev, [index]: [...existing, ...Array.from(newFiles)] };
+        });
+    };
+
+    const removeResponsibleDniFile = (responsibleIndex: number, fileIndex: number) => {
+        setResponsibleDniFiles(prev => {
+            const files = prev[responsibleIndex] || [];
+            const newFiles = files.filter((_, i) => i !== fileIndex);
+            return { ...prev, [responsibleIndex]: newFiles };
+        });
     };
 
     const handlePaymentFilesChange = (files: FileList | null) => {
@@ -265,12 +277,28 @@ function RegistrationForm() {
             await supabase.from('registration_responsibles').delete().eq('registration_id', currentRegId);
             if (responsibles.length > 0) {
                 const responsiblesWithFiles = await Promise.all(responsibles.map(async (r, idx) => {
-                    let dniUrl = r.dni_url || null;
+                    // Upload new files
+                    const newDniUrls: string[] = [];
                     if (responsibleDniFiles[idx]) {
-                        dniUrl = await uploadFile(responsibleDniFiles[idx], 'dnis');
+                        for (const file of responsibleDniFiles[idx]) {
+                            const url = await uploadFile(file, 'dnis');
+                            newDniUrls.push(url);
+                        }
                     }
+
+                    // Combine with existing URLs (if we had a way to remove individual existing URLs, we'd handle it here. 
+                    // For now assuming r.dni_urls contains the source of truth for existing ones, which we haven't implemented UI for removal of existing yet perfectly, 
+                    // but let's assume we just append new ones or replace if logic demands. 
+                    // The prompt asked for uploading multiple files. 
+                    // Let's concat new URLs to existing ones if they exist.
+                    const existingUrls = r.dni_urls || [];
+                    // Note: If we supported removal of existing URLs in UI, we would have updated `responsibles` state.
+                    // Assuming adding indiscriminately for now as per "upload multiple".
+
+                    const finalDniUrls = [...existingUrls, ...newDniUrls];
+
                     const { id, ...rest } = r;
-                    return { ...rest, registration_id: currentRegId, dni_url: dniUrl };
+                    return { ...rest, registration_id: currentRegId, dni_urls: finalDniUrls };
                 }));
 
                 const { error: respErr } = await supabase
@@ -516,24 +544,47 @@ function RegistrationForm() {
                                         />
                                         <div className="col-span-1 md:col-span-2 mt-2">
                                             <label className="flex items-center gap-4 cursor-pointer group/dni">
-                                                <div className={`p-2 rounded-lg border border-dashed transition-all ${responsibleDniFiles[idx] || resp.dni_url ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]' : 'border-white/20 text-gray-400 group-hover/dni:border-white/40 group-hover/dni:text-white'}`}>
+                                                <div className={`p-2 rounded-lg border border-dashed transition-all ${responsibleDniFiles[idx]?.length > 0 || (resp.dni_urls && resp.dni_urls.length > 0) ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]' : 'border-white/20 text-gray-400 group-hover/dni:border-white/40 group-hover/dni:text-white'}`}>
                                                     <CreditCard size={18} />
                                                 </div>
                                                 <div className="flex-1">
                                                     <p className="text-xs font-bold text-gray-300">
-                                                        {responsibleDniFiles[idx] ? responsibleDniFiles[idx].name : (resp.dni_url ? "DNI Subido ✓" : "Subir DNI (Frontal/Reverso)")}
+                                                        Subir DNI (Frontal y/o Reverso)
                                                     </p>
-                                                    <p className="text-[10px] text-gray-500">Obligatorio para el registro</p>
+                                                    <p className="text-[10px] text-gray-500">Puedes subir varios archivos si es necesario</p>
                                                 </div>
                                                 <input
                                                     type="file"
+                                                    multiple
                                                     accept="image/*,.pdf"
                                                     className="hidden"
-                                                    onChange={(e) => {
-                                                        if (e.target.files?.[0]) handleResponsibleDniFileChange(idx, e.target.files[0]);
-                                                    }}
+                                                    onChange={(e) => handleResponsibleDniFileChange(idx, e.target.files)}
                                                 />
                                             </label>
+
+                                            {/* File List for Responsible DNI */}
+                                            <div className="mt-2 space-y-1">
+                                                {/* Existing URLs */}
+                                                {resp.dni_urls && resp.dni_urls.map((url, uIdx) => (
+                                                    <div key={`existing-${uIdx}`} className="flex items-center justify-between bg-white/5 px-2 py-1 rounded text-xs">
+                                                        <span className="text-green-500 truncate flex-1">DNI Subido (Guardado)</span>
+                                                        {/* Optional: Add delete button for existing files if needed later */}
+                                                    </div>
+                                                ))}
+                                                {/* Pending Uploads */}
+                                                {responsibleDniFiles[idx] && responsibleDniFiles[idx].map((file, fIdx) => (
+                                                    <div key={`new-${fIdx}`} className="flex items-center justify-between bg-white/5 px-2 py-1 rounded text-xs">
+                                                        <span className="text-gray-300 truncate flex-1">{file.name}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeResponsibleDniFile(idx, fIdx)}
+                                                            className="text-gray-500 hover:text-red-500 ml-2"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -568,7 +619,7 @@ function RegistrationForm() {
                                         <tr className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider border-b border-white/10">
                                             <th className="p-4 font-medium">Datos Básicos</th>
                                             <th className="p-4 font-medium text-center">Entradas</th>
-                                            <th className="p-4 font-medium text-center">Autorización</th>
+                                            <th className="p-4 font-medium text-center">Archivos / Autorización</th>
                                             <th className="p-4"></th>
                                         </tr>
                                     </thead>

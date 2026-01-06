@@ -213,3 +213,43 @@ export async function validateCoupon(code: string) {
     }
 }
 
+export async function updateProfile(prevState: any, formData: FormData) {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return { success: false, message: "No autenticado" };
+        }
+
+        const schoolName = formData.get('school_name') as string;
+        const repName = formData.get('rep_name') as string;
+        const repSurnames = formData.get('rep_surnames') as string;
+        const phone = formData.get('phone') as string;
+
+        if (!schoolName || !repName || !repSurnames || !phone) {
+            return { success: false, message: "Todos los campos son obligatorios" };
+        }
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                school_name: schoolName,
+                rep_name: repName,
+                rep_surnames: repSurnames,
+                phone: phone
+            })
+            .eq('id', user.id);
+
+        if (error) throw new Error(error.message);
+
+        revalidatePath('/dashboard');
+        return typeProfileResult({ success: true, message: "Perfil actualizado correctamente" });
+
+    } catch (error: any) {
+        console.error("Update profile error:", error);
+        return { success: false, message: error.message };
+    }
+}
+
+function typeProfileResult(res: { success: boolean, message: string }) { return res; }
+
+

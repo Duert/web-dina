@@ -44,7 +44,7 @@ export interface RegistrationResponsible {
     surnames: string;
     phone: string;
     email: string;
-    dni_url?: string; // [NEW] DNI Upload
+    dni_urls?: string[]; // [NEW] DNI Upload (Multiple)
 }
 
 export interface RegistrationParticipant {

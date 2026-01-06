@@ -18,13 +18,41 @@ import {
     ShieldCheck
 } from "lucide-react";
 import { Registration } from "@/types";
+import { updateProfile } from "@/app/actions";
+import { useFormState } from "react-dom"; // Use experimental hook if available or implement wrapper. 
+// Standard in Next 14 is useFormState from react-dom
+import { useRef } from "react";
 
 export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const router = useRouter();
+
+    // Server Action State for Edit Profile
+    const [editState, formAction] = useFormState(updateProfile, { success: false, message: '' });
+
+    useEffect(() => {
+        if (editState?.success) {
+            setIsEditProfileOpen(false);
+            // Reload profile data locally to avoid full page refresh lag
+            if (user) loadProfile(user.id);
+            alert("Perfil actualizado correctamente"); // Simple feedback
+        } else if (editState?.message) {
+            alert(editState.message);
+        }
+    }, [editState, user]);
+
+    const loadProfile = async (uid: string) => {
+        const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', uid)
+            .single();
+        setProfile(profileData);
+    };
 
     useEffect(() => {
         const checkUser = async () => {
@@ -36,12 +64,7 @@ export default function DashboardPage() {
             setUser(user);
 
             // Fetch Profile
-            const { data: profileData } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-            setProfile(profileData);
+            loadProfile(user.id);
 
             fetchRegistrations(user.id);
         };
@@ -108,6 +131,14 @@ export default function DashboardPage() {
                     <div className="absolute top-0 right-0 p-8 opacity-10">
                         <Building2 size={160} />
                     </div>
+
+                    <button
+                        onClick={() => setIsEditProfileOpen(true)}
+                        className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors z-20"
+                        title="Editar Perfil"
+                    >
+                        <Settings size={20} className="text-white" />
+                    </button>
 
                     <div className="relative z-10">
                         <div className="flex items-center gap-2 text-[var(--primary)] font-black uppercase tracking-[0.2em] text-xs mb-4">
@@ -200,6 +231,87 @@ export default function DashboardPage() {
                     </div>
                 )}
             </main>
+
+            {/* EDIT PROFILE MODAL */}
+            {isEditProfileOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-lg p-6 relative shadow-2xl animate-in zoom-in-95 duration-200">
+                        <button
+                            onClick={() => setIsEditProfileOpen(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                        >
+                            <LogOut className="rotate-45" size={24} />
+                        </button>
+
+                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                            <Settings className="text-[var(--primary)]" />
+                            Editar Perfil
+                        </h2>
+
+                        <form action={formAction} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Nombre de la Escuela</label>
+                                <input
+                                    name="school_name"
+                                    defaultValue={profile?.school_name}
+                                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--primary)] outline-none"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Nombre Rep.</label>
+                                    <input
+                                        name="rep_name"
+                                        defaultValue={profile?.rep_name}
+                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--primary)] outline-none"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Apellidos</label>
+                                    <input
+                                        name="rep_surnames"
+                                        defaultValue={profile?.rep_surnames}
+                                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--primary)] outline-none"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Teléfono</label>
+                                <input
+                                    name="phone"
+                                    defaultValue={profile?.phone}
+                                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--primary)] outline-none"
+                                    required
+                                />
+                            </div>
+
+                            <p className="text-xs text-gray-500 mt-2">* El email no se puede cambiar ya que es tu identificador de acceso.</p>
+
+                            <div className="pt-4 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditProfileOpen(false)}
+                                    className="px-4 py-2 rounded-xl text-sm font-bold text-gray-400 hover:bg-white/5 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="bg-[var(--primary)] text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-pink-600 transition-colors shadow-lg shadow-pink-500/20"
+                                >
+                                    Guardar Cambios
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
