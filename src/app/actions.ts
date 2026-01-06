@@ -213,9 +213,13 @@ export async function validateCoupon(code: string) {
     }
 }
 
+// Note: We need to import the server version for this function now
+import { createClient } from "@/lib/supabase-server";
+
 export async function updateProfile(prevState: any, formData: FormData) {
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const supabaseServer = await createClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
         if (!user) {
             return { success: false, message: "No autenticado" };
         }
@@ -229,7 +233,7 @@ export async function updateProfile(prevState: any, formData: FormData) {
             return { success: false, message: "Todos los campos son obligatorios" };
         }
 
-        const { error } = await supabase
+        const { error } = await supabaseServer
             .from('profiles')
             .update({
                 school_name: schoolName,
