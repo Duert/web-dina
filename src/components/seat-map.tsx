@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Seat, Zone } from "@/types";
 import { cn } from "@/lib/utils";
-import { Check, User, Ban } from "lucide-react";
+import { Check, User, Ban, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface SeatMapProps {
     seats: Seat[];
@@ -142,10 +142,17 @@ export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = fa
             </div>
 
             {/* Controls */}
-            <div className="absolute bottom-8 right-8 flex flex-col gap-2 bg-white p-2 rounded shadow border z-50">
-                <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-2 hover:bg-gray-100 rounded" title="Zoom In">+</button>
-                <div className="text-center text-xs text-gray-500">{Math.round(scale * 100)}%</div>
-                <button onClick={() => setScale(s => Math.max(0.3, s - 0.1))} className="p-2 hover:bg-gray-100 rounded" title="Zoom Out">-</button>
+            <div className="absolute bottom-8 right-8 flex flex-col gap-2 bg-white/90 backdrop-blur p-2 rounded-lg shadow-lg border border-slate-200 z-50">
+                <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-2 hover:bg-slate-100 rounded-md transition-colors" title="Zoom In">
+                    <ZoomIn size={20} className="text-slate-700" />
+                </button>
+                <div className="text-center text-xs font-bold text-slate-500 py-1 border-y border-slate-100 my-1">{Math.round(scale * 100)}%</div>
+                <button onClick={() => setScale(s => Math.max(0.3, s - 0.1))} className="p-2 hover:bg-slate-100 rounded-md transition-colors" title="Zoom Out">
+                    <ZoomOut size={20} className="text-slate-700" />
+                </button>
+                <button onClick={() => setScale(0.6)} className="p-2 hover:bg-slate-100 rounded-md transition-colors border-t border-slate-100 mt-1" title="Restablecer Zoom">
+                    <RotateCcw size={16} className="text-slate-500" />
+                </button>
             </div>
         </div>
     );

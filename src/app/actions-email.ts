@@ -40,6 +40,13 @@ export async function sendRegistrationEmail(registrationId: string) {
             <h3>Responsables:</h3>
             <pre>${responsiblesList}</pre>
 
+            ${reg.notes ? `
+            <h3>Notas de la Organización:</h3>
+            <div style="background-color: #f3f4f6; padding: 10px; border-radius: 5px; color: #333;">
+                ${reg.notes.replace(/\n/g, '<br>')}
+            </div>
+            ` : ''}
+
             <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin">Ver en Panel de Admin</a></p>
         `;
 

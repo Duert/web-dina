@@ -29,6 +29,10 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
     const [showCheckout, setShowCheckout] = useState(false);
     const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
     const [orderId, setOrderId] = useState<string | null>(null); // If set, showing success
+    const [couponCode, setCouponCode] = useState("");
+    const [couponDetails, setCouponDetails] = useState<{ id: string, type: 'fixed' | 'percentage', value: number } | null>(null);
+    const [couponError, setCouponError] = useState<string | null>(null);
+    const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
     // We use the passed seats which already have DB status (sold/available)
     // We don't need a state for 'allSeats' unless we plan to update them via realtime, 
@@ -42,7 +46,42 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
         }
     };
 
-    const totalAmount = selectedSeats.reduce((acc, seat) => acc + (PRICES[seat.zone as keyof typeof PRICES] || 0), 0);
+    const baseAmount = selectedSeats.reduce((acc, seat) => acc + (PRICES[seat.zone as keyof typeof PRICES] || 0), 0);
+
+    let discountAmount = 0;
+    if (couponDetails) {
+        if (couponDetails.type === 'percentage') {
+            discountAmount = (baseAmount * couponDetails.value) / 100;
+        } else {
+            discountAmount = Math.min(couponDetails.value, baseAmount); // Can't discount more than total
+        }
+    }
+
+    const totalAmount = Math.max(0, baseAmount - discountAmount);
+
+    const handleValidateCoupon = async () => {
+        if (!couponCode) return;
+        setIsValidatingCoupon(true);
+        setCouponError(null);
+        try {
+            const { validateCoupon } = await import("@/app/actions");
+            const res = await validateCoupon(couponCode);
+            if (res.success) {
+                setCouponDetails({
+                    id: res.couponId!,
+                    type: res.discountType as any,
+                    value: res.discountValue!
+                });
+            } else {
+                setCouponError(res.message || "Error al validar");
+                setCouponDetails(null);
+            }
+        } catch (err) {
+            setCouponError("Error de conexión");
+        } finally {
+            setIsValidatingCoupon(false);
+        }
+    };
 
     const handleInitialClick = () => {
         setShowCheckout(true);
@@ -58,7 +97,9 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
 
             const result = await purchaseTickets(session.id, selectedSeats.map(s => s.id), {
                 ...formData,
-                total: totalAmount
+                total: totalAmount,
+                couponId: couponDetails?.id,
+                discountAmount: discountAmount
             });
 
             if (result.success) {
@@ -155,10 +196,60 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
                                 />
                             </div>
 
+                            {/* COUPON SECTION */}
+                            <div className="pt-4 border-t border-slate-200">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">¿Tienes un código de descuento?</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        className="flex-1 p-2 border border-slate-300 rounded-md bg-white text-slate-900 focus:border-[var(--primary)] outline-none font-mono text-sm uppercase"
+                                        placeholder="CÓDIGO"
+                                        value={couponCode}
+                                        onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                                        disabled={!!couponDetails || isValidatingCoupon}
+                                    />
+                                    {couponDetails ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCouponDetails(null); setCouponCode(""); }}
+                                            className="px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded"
+                                        >
+                                            Quitar
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={handleValidateCoupon}
+                                            disabled={!couponCode || isValidatingCoupon}
+                                            className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold disabled:opacity-50 transition-colors"
+                                        >
+                                            {isValidatingCoupon ? "..." : "Aplicar"}
+                                        </button>
+                                    )}
+                                </div>
+                                {couponError && <p className="text-[10px] text-red-500 mt-1 font-medium">{couponError}</p>}
+                                {couponDetails && (
+                                    <p className="text-[10px] text-green-600 mt-1 font-bold">
+                                        ¡Descuento aplicado: -{couponDetails.type === 'percentage' ? `${couponDetails.value}%` : `${couponDetails.value}€`}!
+                                    </p>
+                                )}
+                            </div>
+
                             <div className="pt-4 border-t border-slate-200 mt-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-slate-600 font-medium">Total a pagar</span>
-                                    <span className="font-black text-2xl text-slate-900">{totalAmount}€</span>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center text-sm text-slate-500">
+                                        <span>Subtotal</span>
+                                        <span>{baseAmount}€</span>
+                                    </div>
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm text-green-600 font-medium">
+                                            <span>Descuento</span>
+                                            <span>-{discountAmount}€</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center pt-2">
+                                        <span className="text-slate-900 font-bold">Total a pagar</span>
+                                        <span className="font-black text-2xl text-slate-900">{totalAmount}€</span>
+                                    </div>
                                 </div>
                                 <div className="text-xs text-slate-500 bg-slate-100 p-3 rounded border border-slate-200">
                                     * El pago se realizará manualmente mediante Bizum/Transferencia tras confirmar.

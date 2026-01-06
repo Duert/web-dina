@@ -27,8 +27,14 @@ export interface Registration {
     id?: string; // Optional because it's generated on DB
     group_name: string;
     category: DanceCategory;
-    payment_proof_url?: string;
+    payment_proof_url?: string; // @deprecated use payment_proof_urls
+    payment_proof_urls?: string[]; // [NEW] Multiple proofs
+    music_file_url?: string; // Link to uploaded MP3/Audio
+    notes?: string; // [NEW] Notes to organization
     created_at?: string;
+    user_id?: string;
+    status: 'draft' | 'submitted';
+    school_name?: string;
 }
 
 export interface RegistrationResponsible {
@@ -38,6 +44,7 @@ export interface RegistrationResponsible {
     surnames: string;
     phone: string;
     email: string;
+    dni_url?: string; // [NEW] DNI Upload
 }
 
 export interface RegistrationParticipant {
@@ -48,6 +55,7 @@ export interface RegistrationParticipant {
     dob: string; // YYYY-MM-DD
     num_tickets: number;
     authorization_url?: string;
+    dni_url?: string; // [NEW] DNI Upload
 }
 
 export interface Ticket {

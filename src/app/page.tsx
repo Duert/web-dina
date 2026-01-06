@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { LocationModal } from "@/components/ui/location-modal";
 import { supabase } from "@/lib/supabase";
 import JudgesSection from "@/components/judges-section";
+import FAQSection from "@/components/faq-section";
 
 export default function Home() {
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -95,7 +96,7 @@ export default function Home() {
           <div className="flex flex-col gap-4">
             {/* Registration Button */}
             <Link
-              href="/registration"
+              href="/dashboard"
               className="w-full bg-[var(--primary)] border-2 border-[var(--primary)] p-4 rounded-2xl flex items-center justify-center gap-4 hover:bg-pink-600 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(255,0,204,0.3)]"
             >
               <Ticket className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
@@ -184,6 +185,11 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* FAQ SECTION */}
+        <div className="w-full mb-24">
+          <FAQSection />
         </div>
 
         {/* Sessions Actions */}

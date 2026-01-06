@@ -8,6 +8,8 @@ interface CustomerData {
     email: string;
     phone: string;
     total: number;
+    couponId?: string;
+    discountAmount?: number;
 }
 
 export async function purchaseTickets(sessionId: string, seatIds: string[], customer: CustomerData) {
@@ -26,6 +28,30 @@ export async function purchaseTickets(sessionId: string, seatIds: string[], cust
             return { success: false, message: 'Algunas de las butacas seleccionadas ya no están disponibles.' };
         }
 
+        // 1.5 Verify Coupon again if provided
+        if (customer.couponId) {
+            const { data: coupon, error: couponError } = await supabase
+                .from('coupons')
+                .select('*')
+                .eq('id', customer.couponId)
+                .single();
+
+            if (couponError || !coupon || !coupon.is_active) {
+                throw new Error("El cupón ya no es válido.");
+            }
+
+            if (coupon.max_uses !== null && coupon.current_uses >= coupon.max_uses) {
+                throw new Error("El cupón ha agotado sus usos.");
+            }
+
+            if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+                throw new Error("El cupón ha caducado.");
+            }
+
+            // Increment usage
+            await supabase.rpc('increment_coupon_uses', { coupon_id: customer.couponId });
+        }
+
         // 2. Create Order
         const { data: order, error: orderError } = await supabase
             .from('orders')
@@ -35,7 +61,9 @@ export async function purchaseTickets(sessionId: string, seatIds: string[], cust
                 customer_phone: customer.phone,
                 total_amount: customer.total,
                 payment_status: 'pending',
-                payment_provider: 'manual' // Bizum/Transfer
+                payment_provider: 'manual', // Bizum/Transfer
+                coupon_id: customer.couponId || null,
+                discount_applied: customer.discountAmount || 0
             })
             .select()
             .single();
@@ -150,3 +178,38 @@ export async function cleanupExpiredOrders() {
         return { success: false, message: error.message };
     }
 }
+
+export async function validateCoupon(code: string) {
+    try {
+        const { data: coupon, error } = await supabase
+            .from('coupons')
+            .select('*')
+            .eq('code', code.toUpperCase())
+            .eq('is_active', true)
+            .single();
+
+        if (error || !coupon) {
+            return { success: false, message: "Cupón no encontrado o inválido." };
+        }
+
+        // Check limits
+        if (coupon.max_uses !== null && coupon.current_uses >= coupon.max_uses) {
+            return { success: false, message: "El cupón ha agotado sus usos." };
+        }
+
+        // Check expiry
+        if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+            return { success: false, message: "El cupón ha caducado." };
+        }
+
+        return {
+            success: true,
+            couponId: coupon.id,
+            discountType: coupon.discount_type,
+            discountValue: coupon.discount_value
+        };
+    } catch (err) {
+        return { success: false, message: "Error al validar el cupón." };
+    }
+}
+
