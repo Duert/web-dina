@@ -5,13 +5,41 @@ import Image from "next/image";
 import { Calendar, MapPin, Ticket, FileText, Camera, Instagram } from "lucide-react";
 import { useState, useEffect } from "react";
 import { LocationModal } from "@/components/ui/location-modal";
+import { EventInfoModal } from "@/components/ui/event-info-modal";
 import { supabase } from "@/lib/supabase";
 import JudgesSection from "@/components/judges-section";
 import FAQSection from "@/components/faq-section";
 
 export default function Home() {
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
   const [salesOpen, setSalesOpen] = useState(false);
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    // Countdown Logic
+    const targetDate = new Date('2026-03-01T09:00:00');
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = targetDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeLeft("¡ES HOY!");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+      setTimeLeft(`${days}d ${hours}h`);
+    };
+
+    // AV: Countdown disabled as date is not confirmed
+    // updateCountdown();
+    // const interval = setInterval(updateCountdown, 1000 * 60); 
+    // return () => clearInterval(interval);
+  }, []);
 
   // Fetch 'app_settings' locally to decide if sales are open
   useEffect(() => {
@@ -63,46 +91,68 @@ export default function Home() {
           <p className="text-xl md:text-2xl text-pink-200 mt-4 font-light tracking-widest uppercase opacity-90">
             Campeonato Coreográfico de la Vall d'Uixó
           </p>
-          <p className="text-lg md:text-xl text-pink-200 mt-2 font-light tracking-widest uppercase opacity-90">
-            1 de Marzo 2026
+          <p className="text-lg md:text-xl text-[var(--primary)] mt-2 font-bold tracking-widest uppercase drop-shadow-[0_0_10px_rgba(255,0,204,0.5)]">
+            Fecha por confirmar
           </p>
         </div>
 
         {/* Info Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-16">
           {/* Date and Contact Column */}
-          <div className="flex flex-col gap-4">
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-6 rounded-2xl flex flex-col items-center hover:bg-white/10 transition-colors group flex-1 justify-center">
-              <Calendar className="w-8 h-8 text-[var(--primary)] mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-bold text-white mb-1">FECHA</h3>
-              <p className="text-gray-400">1 Marzo 2026</p>
-            </div>
+          <div className="flex flex-col gap-4 h-full">
+            <button
+              onClick={() => setShowEventModal(true)}
+              className="flex-[2] bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center gap-1 hover:bg-white/10 hover:border-[var(--primary)]/50 transition-all cursor-pointer group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-[var(--primary)]/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+
+              <Calendar className="w-8 h-8 text-[var(--primary)] group-hover:scale-110 transition-transform relative z-10" />
+
+              <div className="relative z-10 flex flex-col items-center gap-1 w-full">
+                <div className="relative h-4 w-full flex items-center justify-center">
+                  <h3 className="font-bold text-white text-xs tracking-widest absolute">FECHA</h3>
+                  {/* <h3 className="font-bold text-pink-300 text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-opacity absolute">FALTAN</h3> */}
+                </div>
+
+                <div className="relative h-6 w-full flex items-center justify-center">
+                  <p className="text-white font-black text-lg leading-none absolute whitespace-nowrap">POR CONFIRMAR</p>
+                  {/* <p className="text-white font-black text-xl leading-none opacity-0 group-hover:opacity-100 transition-opacity absolute font-mono">{timeLeft}</p> */}
+                </div>
+              </div>
+            </button>
 
             <a
               href="https://instagram.com/cc_danceinaction"
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center justify-center gap-3 hover:bg-gradient-to-r hover:from-[#833ab4] hover:via-[#fd1d1d] hover:to-[#fcb045] hover:border-transparent transition-all group"
+              className="flex-[3] bg-white/5 backdrop-blur-sm border border-white/10 p-6 rounded-2xl flex flex-col items-center justify-center gap-3 hover:bg-gradient-to-r hover:from-[#833ab4] hover:via-[#fd1d1d] hover:to-[#fcb045] hover:border-transparent transition-all group shadow-[0_0_15px_rgba(255,255,255,0.1)]"
             >
-              <Instagram className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
-              <div className="text-left">
-                <h3 className="font-bold text-white text-xs">CONTACTO</h3>
-                <p className="text-[10px] text-gray-400 group-hover:text-white/90">Instagram Direct</p>
+              <Instagram className="w-10 h-10 text-gray-300 group-hover:text-white transition-colors group-hover:scale-110 duration-300" />
+              <div className="text-center">
+                <h3 className="font-bold text-white text-lg">CONTACTO</h3>
+                <p className="text-sm text-gray-400 group-hover:text-white/90">@cc_danceinaction</p>
               </div>
             </a>
           </div>
 
           {/* Center Column with Registration and Location */}
-          <div className="flex flex-col gap-4">
-            {/* Registration Button */}
+          {/* Center Column with Registration and Location */}
+          <div className="flex flex-col gap-4 h-full">
             <Link
-              href="/dashboard"
-              className="w-full bg-[var(--primary)] border-2 border-[var(--primary)] p-4 rounded-2xl flex items-center justify-center gap-4 hover:bg-pink-600 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(255,0,204,0.3)]"
+              href="/registration"
+              className="w-full flex-1 bg-[var(--primary)] border-2 border-[var(--primary)] p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-pink-600 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.5)]"
             >
-              <Ticket className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
-              <div className="text-left">
-                <h3 className="font-black text-white text-lg leading-none">INSCRIPCIONES</h3>
-                <p className="text-pink-100 text-xs font-medium">Registra tu grupo ahora</p>
+              <div className="w-16 h-16 relative mb-2 group-hover:scale-110 transition-transform">
+                <Image
+                  src="/logo-inscripciones-white.png"
+                  alt="Logo Inscripciones"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center">
+                <h3 className="font-black text-white text-2xl leading-none mb-1">INSCRIPCIONES</h3>
+                <p className="text-pink-100 text-sm font-medium">Registra tu grupo ahora</p>
               </div>
             </Link>
 
@@ -118,29 +168,50 @@ export default function Home() {
 
           {/* Downloads Column */}
           <div className="flex flex-col gap-4">
+            <h3 className="text-white font-bold text-sm tracking-wider opacity-70 mb-1">DESCARGAS</h3>
+
             <a
               href="/docs/bases.pdf"
               target="_blank"
               download
-              className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center justify-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] transition-all group"
+              className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
             >
-              <FileText className="w-6 h-6 text-pink-300 group-hover:scale-110 transition-transform" />
+              <div className="bg-white/10 p-2 rounded-lg group-hover:bg-[var(--primary)]/20 transition-colors">
+                <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
+              </div>
               <div className="text-left">
-                <h3 className="font-bold text-white text-sm">DESCARGAR BASES</h3>
-                <p className="text-xs text-gray-400">PDF Oficial</p>
+                <h3 className="font-bold text-white text-sm">BASES</h3>
+                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Oficiales 2026</p>
               </div>
             </a>
 
             <a
-              href="/docs/autorizacion.pdf"
+              href="/docs/autorizacion_menores.pdf"
               target="_blank"
               download
-              className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center justify-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] transition-all group"
+              className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
             >
-              <Camera className="w-6 h-6 text-pink-300 group-hover:scale-110 transition-transform" />
+              <div className="bg-white/10 p-2 rounded-lg group-hover:bg-[var(--primary)]/20 transition-colors">
+                <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
+              </div>
               <div className="text-left">
-                <h3 className="font-bold text-white text-sm">AUTORIZACIÓN IMAGEN</h3>
-                <p className="text-xs text-gray-400">Para menores</p>
+                <h3 className="font-bold text-white text-sm">AUTORIZACIÓN</h3>
+                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Menores de edad</p>
+              </div>
+            </a>
+
+            <a
+              href="/docs/autorizacion_mayores.pdf"
+              target="_blank"
+              download
+              className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
+            >
+              <div className="bg-white/10 p-2 rounded-lg group-hover:bg-[var(--primary)]/20 transition-colors">
+                <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-white text-sm">AUTORIZACIÓN</h3>
+                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Mayores de edad</p>
               </div>
             </a>
           </div>
@@ -240,6 +311,7 @@ export default function Home() {
       </main >
 
       <LocationModal isOpen={showLocationModal} onClose={() => setShowLocationModal(false)} />
+      <EventInfoModal isOpen={showEventModal} onClose={() => setShowEventModal(false)} />
     </div >
   );
 }

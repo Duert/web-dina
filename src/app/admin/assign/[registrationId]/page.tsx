@@ -51,7 +51,7 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
         try {
             const { data, error } = await supabase
                 .from('registrations')
-                .select('*, registration_participants(count)')
+                .select('*, registration_participants(num_tickets)')
                 .eq('id', registrationId)
                 .single();
 
@@ -107,9 +107,24 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
     // 5. Toggle Logic
     const [lastSelectedSeat, setLastSelectedSeat] = useState<Seat | null>(null);
 
-    const handleSeatToggle = (seat: Seat, e: React.MouseEvent) => {
-        // If seat is 'reserved' (already owned by this group), maybe allow unselecting?
-        // For now, let's focus on ASSIGNING available seats.
+    const handleSeatToggle = async (seat: Seat, e: React.MouseEvent) => {
+        // Calculate counts dynamically inside handler to ensure freshness, 
+        // OR better: rely on state. But current assignedCount definition is outside.
+        // Let's redefine requestedCount here:
+        const requestedCount = registration?.registration_participants?.reduce((sum: number, p: any) => sum + (p.num_tickets || 0), 0) || 0;
+
+        // 1. Unassign Logic (If seat is owned by this group)
+        if (seat.status === 'reserved') {
+            if (confirm(`¿Desasignar asiento ${seat.id}?`)) {
+                setLoading(true); // temporary loading state
+                await supabase.from('tickets').delete().eq('session_id', session).eq('seat_id', seat.id);
+                // Refresh
+                const { data } = await supabase.from('tickets').select('*').eq('session_id', session);
+                if (data) setExistingTickets(data);
+                setLoading(false);
+            }
+            return;
+        }
 
         // Shift Click Range Selection
         if (e.shiftKey && lastSelectedSeat) {
@@ -121,15 +136,35 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
                 const high = Math.max(startIdx, endIdx);
                 const range = initialSeats.slice(low, high + 1);
 
-                // Add all available seats in range to selection (avoid duplicates)
+                // Check remaining capacity (Strict Limit)
+                const remaining = requestedCount - assignedCount - selectedSeats.length;
+                if (remaining <= 0) {
+                    alert(`Límite de ${requestedCount} butacas alcanzado. No puedes seleccionar más.`);
+                    return;
+                }
+
+                // Add available seats in range
                 const newSelection = [...selectedSeats];
+                let addedCount = 0;
+
                 range.forEach(s => {
-                    // Only select if available and not already selected
+                    if (addedCount >= remaining) return; // Stop if limit reached in range
+
                     const isAvailable = computedSeats.find(cs => cs.id === s.id)?.status === 'available';
+                    // Only add if not already selected
                     if (isAvailable && !newSelection.some(sel => sel.id === s.id)) {
                         newSelection.push(s);
+                        addedCount++;
                     }
                 });
+
+                if (addedCount > 0 && addedCount < range.filter(s => computedSeats.find(cs => cs.id === s.id)?.status === 'available').length) {
+                    // If we stopped early due to limit
+                    alert(`Se han seleccionado solo ${addedCount} butacas para no exceder el límite de ${requestedCount}.`);
+                } else if (addedCount === 0 && range.some(s => computedSeats.find(cs => cs.id === s.id)?.status === 'available')) {
+                    alert(`Límite de ${requestedCount} butacas alcanzado.`);
+                }
+
                 setSelectedSeats(newSelection);
                 return;
             }
@@ -142,7 +177,12 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
             setSelectedSeats(prev => prev.filter(s => s.id !== seat.id));
             setLastSelectedSeat(null);
         } else {
-            // Check capacity limits? Nah, let admin decide.
+            // Check capacity limits (Strict)
+            if (assignedCount + selectedSeats.length >= requestedCount) {
+                alert(`Límite de ${requestedCount} butacas alcanzado. No puedes asignar más.`);
+                return;
+            }
+
             setSelectedSeats(prev => [...prev, seat]);
             setLastSelectedSeat(seat);
         }
@@ -201,7 +241,8 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
     if (loading || !registration) return <div className="min-h-screen bg-black text-white p-8">Cargando...</div>;
 
     const assignedCount = existingTickets.filter(t => t.registration_id === registrationId).length;
-    const requestedCount = registration.registration_participants?.[0]?.count || 0;
+    // Recalculate for display
+    const requestedCount = registration.registration_participants?.reduce((sum: number, p: any) => sum + (p.num_tickets || 0), 0) || 0;
 
     return (
         <div className="flex flex-col h-screen bg-neutral-950">

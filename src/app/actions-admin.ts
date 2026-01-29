@@ -114,3 +114,121 @@ export async function deleteRegistration(registrationId: string) {
         return { success: false, error: e.message };
     }
 }
+
+export async function toggleSchoolApproval(userId: string, isApproved: boolean) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseServiceKey) return { success: false, error: "Falta SUPABASE_SERVICE_ROLE_KEY" };
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    try {
+        const { error } = await supabaseAdmin
+            .from('profiles')
+            .update({ is_approved: isApproved })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function getAllRegistrationsAction() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseServiceKey) {
+        return { success: false, error: "Server misconfiguration: Missing Service Key" };
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    });
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('registrations')
+            .select(`
+                *,
+                profiles(school_name),
+                registration_responsibles(count),
+                registration_participants(num_tickets),
+                tickets(count)
+            `)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        console.log(`getAllRegistrationsAction: Found ${data?.length} registrations`);
+        return { success: true, data };
+    } catch (error: any) {
+        console.error("Error creating registrations:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function getRegistrationDetailsAction(id: string) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseServiceKey) return { success: false, error: "Missing Service Key" };
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('registrations')
+            .select(`
+                *,
+                registration_responsibles(*),
+                registration_participants(*)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function getSchoolRegistrationsAction(userId: string) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseServiceKey) return { success: false, error: "Missing Service Key" };
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('registrations')
+            .select(`
+                *,
+                registration_responsibles(count),
+                registration_participants(*)
+            `)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}

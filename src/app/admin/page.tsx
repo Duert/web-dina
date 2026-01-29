@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Users, Building, Download, RefreshCw, Trash2, Gavel, Lock, LayoutDashboard, FileText, X, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle, Building2, Mail, Phone, Music } from "lucide-react";
+import { ArrowLeft, Users, Building, Download, RefreshCw, Trash2, Gavel, Lock, LayoutDashboard, FileText, X, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle, Building2, Mail, Phone, Music, ChevronLeft, Filter, MoreVertical, CheckCircle2, XCircle, User as UserIcon, Unlock, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as XLSX from 'xlsx';
-import { deleteRegistration, resetApplicationData } from "@/app/actions-admin";
+import { deleteRegistration, resetApplicationData, toggleSchoolApproval, getAllRegistrationsAction, getRegistrationDetailsAction, getSchoolRegistrationsAction } from "@/app/actions-admin";
 import AdminJudgesManager from "@/components/admin-judges-manager";
 import AdminFAQManager from "@/components/admin-faq-manager";
 import AdminCouponManager from "@/components/admin-coupon-manager";
+import AdminSeatingManager from "@/components/admin-seating-manager";
 import { Registration } from "@/types";
 import dynamic from "next/dynamic";
 import { RegistrationDocument } from "@/components/pdf/RegistrationDocument";
@@ -37,9 +38,12 @@ export default function AdminPage() {
     // Data State
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'schools' | 'config' | 'judges' | 'faq' | 'coupons'>('registrations');
+    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'schools' | 'config' | 'judges' | 'faq' | 'coupons' | 'seating'>('registrations');
     const [publicSalesEnabled, setPublicSalesEnabled] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+
+    // Sort State
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
     // School View State
     const [schools, setSchools] = useState<any[]>([]);
@@ -85,19 +89,22 @@ export default function AdminPage() {
     const fetchRegistrations = async () => {
         setLoading(true);
         try {
-            // Fetch registrations with counts
-            const { data, error } = await supabase
-                .from('registrations')
-                .select(`
-                    *,
-                    registration_responsibles (count),
-                    registration_participants (num_tickets),
-                    tickets (count)
-                `)
-                .order('created_at', { ascending: true });
+            const result = await getAllRegistrationsAction();
 
-            if (error) throw error;
-            setRegistrations(data || []);
+            if (!result.success || !result.data) throw new Error(result.error);
+            const data = result.data;
+            console.log("AdminPage fetchRegistrations data:", data);
+
+            // Map profile.school_name to flat school_name for table
+            // Priority: Profile Name > Registration Snapshot Name > Unknown
+            const formattedData = data?.map((reg: any) => ({
+                ...reg,
+                school_name: reg.profiles?.school_name || reg.school_name || "Desconocida"
+            })) || [];
+
+            console.log("AdminPage formattedData:", formattedData);
+
+            setRegistrations(formattedData);
         } catch (err) {
             console.error("Error fetching registrations:", err);
         } finally {
@@ -107,18 +114,9 @@ export default function AdminPage() {
 
     const fetchRegistrationDetails = async (id: string) => {
         try {
-            const { data, error } = await supabase
-                .from('registrations')
-                .select(`
-                    *,
-                    registration_responsibles (*),
-                    registration_participants (*)
-                `)
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-            setSelectedRegistration(data);
+            const result = await getRegistrationDetailsAction(id);
+            if (!result.success || !result.data) throw new Error(result.error);
+            setSelectedRegistration(result.data);
         } catch (err) {
             console.error("Error fetching details:", err);
         }
@@ -160,18 +158,12 @@ export default function AdminPage() {
 
     const fetchSchoolRegistrations = async (userId: string) => {
         setSchoolRegistrations([]); // Clear previous
-        const { data, error } = await supabase
-            .from('registrations')
-            .select(`
-                *,
-                registration_responsibles (count),
-                registration_participants (*)
-            `)
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-
-        if (!error) {
-            setSchoolRegistrations(data || []);
+        try {
+            const result = await getSchoolRegistrationsAction(userId);
+            if (!result.success || !result.data) throw new Error(result.error);
+            setSchoolRegistrations(result.data);
+        } catch (error) {
+            console.error("Error fetching school registrations", error);
         }
     };
 
@@ -179,6 +171,79 @@ export default function AdminPage() {
         setSelectedSchool(school);
         fetchSchoolRegistrations(school.id);
     };
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedRegistrations = [...registrations].sort((a, b) => {
+        if (!sortConfig) return 0;
+
+        const { key, direction } = sortConfig;
+
+        // Complex Sort Logic
+        if (key === 'tickets_count') {
+            const valA = a.registration_participants?.reduce((sum: number, p: any) => sum + p.num_tickets, 0) || 0;
+            const valB = b.registration_participants?.reduce((sum: number, p: any) => sum + p.num_tickets, 0) || 0;
+            return direction === 'asc' ? valA - valB : valB - valA;
+        }
+
+        if (key === 'dancers_count') {
+            const valA = a.registration_participants?.length || 0;
+            const valB = b.registration_participants?.length || 0;
+            return direction === 'asc' ? valA - valB : valB - valA;
+        }
+
+        if (key === 'responsibles_count') {
+            const valA = a.registration_responsibles?.[0]?.count || 0;
+            const valB = b.registration_responsibles?.[0]?.count || 0;
+            return direction === 'asc' ? valA - valB : valB - valA;
+        }
+
+        if (key === 'updated_at' || key === 'created_at') {
+            const dateA = new Date(a[key]).getTime();
+            const dateB = new Date(b[key]).getTime();
+            return direction === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+
+        if (key === 'payment_proof') {
+            // Boolean sort: has proof vs not
+            const hasA = (a.payment_proof_urls?.length > 0 || a.payment_proof_url) ? 1 : 0;
+            const hasB = (b.payment_proof_urls?.length > 0 || b.payment_proof_url) ? 1 : 0;
+            return direction === 'asc' ? hasA - hasB : hasB - hasA;
+        }
+
+        if (key === 'assignment_status') {
+            // Sort by pending (0) -> partial (1) -> complete (2)
+            const getStatusScore = (reg: any) => {
+                const total = reg.registration_participants?.reduce((sum: number, p: any) => sum + p.num_tickets, 0) || 0;
+                const assigned = reg.tickets?.[0]?.count || 0;
+                if (total > 0 && assigned >= total) return 2;
+                if (assigned > 0) return 1;
+                return 0;
+            };
+            const scoreA = getStatusScore(a);
+            const scoreB = getStatusScore(b);
+            return direction === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+        }
+
+        // Default String Sort
+        let valA = a[key] || '';
+        let valB = b[key] || '';
+
+        if (key === 'school_name') {
+            valA = a.school_name || "Desconocida";
+            valB = b.school_name || "Desconocida";
+        }
+
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
 
     // --- Export Logic ---
 
@@ -317,6 +382,13 @@ export default function AdminPage() {
                         {activeTab === 'sales' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
                     </button>
                     <button
+                        onClick={() => setActiveTab('seating')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'seating' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Asientos
+                        {activeTab === 'seating' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)]" />}
+                    </button>
+                    <button
                         onClick={() => setActiveTab('judges')}
                         className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'judges' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
                     >
@@ -385,20 +457,141 @@ export default function AdminPage() {
                                 <table className="w-full text-left border-collapse min-w-[800px]">
                                     <thead>
                                         <tr className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider border-b border-white/10">
-                                            <th className="p-4 font-medium">Grupo / Escuela</th>
-                                            <th className="p-4 font-medium text-center">Estado</th>
-                                            <th className="p-4 font-medium">Categoría</th>
-                                            <th className="p-4 font-medium text-center">Resp.</th>
-                                            <th className="p-4 font-medium text-center">Bailarines</th>
-                                            <th className="p-4 font-medium text-center">Entradas Totales</th>
-                                            <th className="p-4 font-medium text-center">Asignación</th>
-                                            <th className="p-4 font-medium">Justificante</th>
-                                            <th className="p-4 font-medium">Fecha y Hora</th>
+                                            <th
+                                                className="p-4 font-medium cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('group_name')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Grupo / Escuela
+                                                    {sortConfig?.key === 'group_name' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium text-center cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('status')}
+                                            >
+                                                <div className="flex items-center justify-center gap-1">
+                                                    Estado
+                                                    {sortConfig?.key === 'status' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('category')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Categoría
+                                                    {sortConfig?.key === 'category' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('updated_at')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Modificado
+                                                    {sortConfig?.key === 'updated_at' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium text-center cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('responsibles_count')}
+                                            >
+                                                <div className="flex items-center justify-center gap-1">
+                                                    Resp.
+                                                    {sortConfig?.key === 'responsibles_count' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium text-center cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('dancers_count')}
+                                            >
+                                                <div className="flex items-center justify-center gap-1">
+                                                    Bailarines
+                                                    {sortConfig?.key === 'dancers_count' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium text-center cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('tickets_count')}
+                                            >
+                                                <div className="flex items-center justify-center gap-1">
+                                                    Entradas Totales
+                                                    {sortConfig?.key === 'tickets_count' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium text-center cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('assignment_status')}
+                                            >
+                                                <div className="flex items-center justify-center gap-1">
+                                                    Asignación
+                                                    {sortConfig?.key === 'assignment_status' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('payment_proof')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Justificante
+                                                    {sortConfig?.key === 'payment_proof' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th
+                                                className="p-4 font-medium cursor-pointer hover:text-white transition-colors select-none group/th"
+                                                onClick={() => handleSort('created_at')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Fecha y Hora
+                                                    {sortConfig?.key === 'created_at' ? (
+                                                        sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-[var(--primary)]" /> : <ArrowDown size={14} className="text-[var(--primary)]" />
+                                                    ) : (
+                                                        <ArrowUpDown size={14} className="opacity-30 group-hover/th:opacity-100 transition-opacity" />
+                                                    )}
+                                                </div>
+                                            </th>
                                             <th className="p-4"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
-                                        {registrations.map((reg) => {
+                                        {sortedRegistrations.map((reg) => {
                                             // Calculate total tickets from participants
                                             const totalTickets = reg.registration_participants?.reduce((sum: number, p: any) => sum + p.num_tickets, 0) || 0;
 
@@ -423,7 +616,7 @@ export default function AdminPage() {
                                                         {reg.school_name && <div className="text-[10px] text-gray-500 uppercase font-black">{reg.school_name}</div>}
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${reg.status === 'submitted' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
+                                                        <span className={`text - [10px] font - black uppercase px - 2 py - 0.5 rounded - full ${reg.status === 'submitted' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'} `}>
                                                             {reg.status === 'submitted' ? 'Enviado' : 'Borrador'}
                                                         </span>
                                                     </td>
@@ -431,6 +624,9 @@ export default function AdminPage() {
                                                         <span className="bg-white/10 text-gray-300 border border-white/10 px-2 py-0.5 rounded text-sm font-medium">
                                                             {reg.category}
                                                         </span>
+                                                    </td>
+                                                    <td className="p-4 text-sm text-gray-400 font-mono">
+                                                        {new Date(reg.updated_at).toLocaleString()}
                                                     </td>
                                                     <td className="p-4 text-center text-gray-400">
                                                         {responsiblesCount}
@@ -457,14 +653,14 @@ export default function AdminPage() {
                                                         )}
                                                     </td>
                                                     <td className="p-4">
-                                                        {reg.payment_proof_url ? (
+                                                        {(reg.payment_proof_urls && reg.payment_proof_urls.length > 0) || reg.payment_proof_url ? (
                                                             <a
-                                                                href={reg.payment_proof_url}
+                                                                href={reg.payment_proof_urls?.[0] || reg.payment_proof_url}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-sm font-medium"
                                                             >
-                                                                <FileText size={16} /> Ver Justificante
+                                                                <FileText size={16} /> Ver Justificante{reg.payment_proof_urls?.length > 1 ? `s(${reg.payment_proof_urls.length})` : ''}
                                                             </a>
                                                         ) : (
                                                             <span className="text-gray-600 text-sm">Pendiente</span>
@@ -520,8 +716,8 @@ export default function AdminPage() {
                                         className="bg-neutral-900 border border-white/10 rounded-2xl p-6 hover:bg-white/5 transition-all cursor-pointer group"
                                     >
                                         <div className="flex items-start justify-between mb-4">
-                                            <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-[var(--primary)] group-hover:scale-110 transition-transform">
-                                                <Building2 size={24} />
+                                            <div className={`w - 12 h - 12 rounded - full flex items - center justify - center transition - transform group - hover: scale - 110 ${school.is_approved ? 'bg-white/5 text-[var(--primary)]' : 'bg-yellow-500/20 text-yellow-500'} `}>
+                                                {school.is_approved ? <Building2 size={24} /> : <AlertTriangle size={24} />}
                                             </div>
                                             <div className="bg-white/5 px-2 py-1 rounded text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                                 Ver Detalles
@@ -537,6 +733,35 @@ export default function AdminPage() {
                                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                                 <Phone size={14} /> {school.rep_phone}
                                             </div>
+                                        </div>
+
+                                        {/* Approval Actions */}
+                                        <div className="mt-4 pt-4 border-t border-white/5 flex gap-2">
+                                            {school.is_approved ? (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm("¿Bloquear acceso a esta escuela?")) {
+                                                            toggleSchoolApproval(school.id, false).then(() => fetchSchools());
+                                                        }
+                                                    }}
+                                                    className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 py-2 rounded-lg text-xs font-bold transition-colors"
+                                                >
+                                                    Bloquear Acceso
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm("¿Aprobar acceso a esta escuela?")) {
+                                                            toggleSchoolApproval(school.id, true).then(() => fetchSchools());
+                                                        }
+                                                    }}
+                                                    className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold transition-colors shadow-lg shadow-green-500/20"
+                                                >
+                                                    APROBAR ACCESO
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -555,6 +780,10 @@ export default function AdminPage() {
                         <h3 className="text-xl font-bold text-gray-400 mb-2">Próximamente</h3>
                         <p className="text-gray-500">El módulo de ventas de entradas estará disponible pronto.</p>
                     </div>
+                )}
+
+                {activeTab === 'seating' && (
+                    <AdminSeatingManager />
                 )}
 
                 {activeTab === 'config' && (
@@ -669,6 +898,28 @@ export default function AdminPage() {
                                             <p className="font-bold text-white">{resp.name} {resp.surnames}</p>
                                             <p className="text-gray-400 text-sm mt-1">{resp.phone}</p>
                                             <p className="text-gray-400 text-sm">{resp.email}</p>
+
+                                            {/* DNI Display */}
+                                            <div className="mt-3 pt-3 border-t border-white/5">
+                                                <p className="text-xs text-gray-500 mb-2">Documentos DNI:</p>
+                                                {resp.dni_urls && resp.dni_urls.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {resp.dni_urls.map((url: string, idx: number) => (
+                                                            <a
+                                                                key={idx}
+                                                                href={url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-1 bg-white/5 hover:bg-white/10 text-blue-400 px-2 py-1 rounded text-xs transition-colors"
+                                                            >
+                                                                <FileText size={12} /> Archivo {idx + 1}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-600 italic">No hay archivos</span>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -688,7 +939,7 @@ export default function AdminPage() {
                                                 <th className="p-3 font-medium">Nombre</th>
                                                 <th className="p-3 font-medium">F. Nacim</th>
                                                 <th className="p-3 font-medium text-center">Entradas</th>
-                                                <th className="p-3 font-medium text-right">Autorización</th>
+                                                <th className="p-3 font-medium text-right">Documentación</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5">
@@ -698,18 +949,81 @@ export default function AdminPage() {
                                                     <td className="p-3 text-gray-400">{new Date(part.dob).toLocaleDateString()}</td>
                                                     <td className="p-3 text-center">{part.num_tickets}</td>
                                                     <td className="p-3 text-right">
-                                                        {part.authorization_url ? (
-                                                            <a href={part.authorization_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[var(--primary)] hover:text-white transition-colors">
-                                                                <FileText size={14} /> <span className="underline">Ver Archivo</span>
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-gray-600 italic">No subida</span>
-                                                        )}
+                                                        <div className="flex flex-col items-end gap-2 text-xs">
+
+                                                            {/* AUTORIZACIÓN */}
+                                                            <div className="flex flex-wrap justify-end gap-1">
+                                                                {/* Legacy */}
+                                                                {part.authorization_url && (
+                                                                    <a href={part.authorization_url} target="_blank" className="bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-pink-400 border border-pink-500/20 flex items-center gap-1">
+                                                                        <FileText size={10} /> Auth (Antigua)
+                                                                    </a>
+                                                                )}
+                                                                {/* New Arrays */}
+                                                                {part.authorization_urls?.map((url: string, i: number) => (
+                                                                    <a key={`auth-${i}`} href={url} target="_blank" className="bg-pink-500/10 hover:bg-pink-500/20 px-2 py-1 rounded text-pink-400 border border-pink-500/20 flex items-center gap-1">
+                                                                        <FileText size={10} /> Auth {i + 1}
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+
+                                                            {/* DNI */}
+                                                            <div className="flex flex-wrap justify-end gap-1">
+                                                                {/* Legacy */}
+                                                                {part.dni_url && (
+                                                                    <a href={part.dni_url} target="_blank" className="bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                                                                        <FileText size={10} /> DNI (Antiguo)
+                                                                    </a>
+                                                                )}
+                                                                {/* New Arrays */}
+                                                                {part.dni_urls?.map((url: string, i: number) => (
+                                                                    <a key={`dni-${i}`} href={url} target="_blank" className="bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                                                                        <FileText size={10} /> DNI {i + 1}
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+
+                                                            {/* DNI AUTORIZADO */}
+                                                            <div className="flex flex-wrap justify-end gap-1">
+                                                                {/* Legacy */}
+                                                                {part.tutor_dni_url && (
+                                                                    <a href={part.tutor_dni_url} target="_blank" className="bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                                                                        <FileText size={10} /> DNI Tutor (Old)
+                                                                    </a>
+                                                                )}
+                                                                {/* New Arrays */}
+                                                                {part.authorized_dni_urls?.map((url: string, i: number) => (
+                                                                    <a key={`authdni-${i}`} href={url} target="_blank" className="bg-purple-500/10 hover:bg-purple-500/20 px-2 py-1 rounded text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                                                                        <FileText size={10} /> DNI Tutor {i + 1}
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+
+                                                            {/* GENERIC FILES (Backward Compat) */}
+                                                            {part.file_urls && part.file_urls.length > 0 && (
+                                                                <div className="flex flex-wrap justify-end gap-1 mt-1 border-t border-white/5 pt-1">
+                                                                    {part.file_urls.map((url: string, i: number) => (
+                                                                        <a key={`gen-${i}`} href={url} target="_blank" className="text-gray-400 hover:text-white underline">Doc {i + 1}</a>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+
+                            {/* Dates */}
+                            <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-bold text-blue-200 text-sm">Fechas</h4>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        <p className="text-blue-200/60 text-xs">Creado: {selectedRegistration.created_at ? new Date(selectedRegistration.created_at).toLocaleString() : '-'}</p>
+                                        <p className="text-blue-200/60 text-xs">Modificado: {selectedRegistration.updated_at ? new Date(selectedRegistration.updated_at).toLocaleString() : '-'}</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -719,7 +1033,21 @@ export default function AdminPage() {
                                     <h4 className="font-bold text-blue-200 text-sm">Justificante de Pago</h4>
                                     <p className="text-blue-200/60 text-xs">Concepto: {selectedRegistration.group_name} + Entradas</p>
                                 </div>
-                                {selectedRegistration.payment_proof_url ? (
+                                {selectedRegistration.payment_proof_urls && selectedRegistration.payment_proof_urls.length > 0 ? (
+                                    <div className="flex bg-blue-500/10 p-2 rounded-lg gap-2">
+                                        {selectedRegistration.payment_proof_urls.map((url: string, idx: number) => (
+                                            <a
+                                                key={idx}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                            >
+                                                <Eye size={12} /> Ver #{idx + 1}
+                                            </a>
+                                        ))}
+                                    </div>
+                                ) : selectedRegistration.payment_proof_url ? (
                                     <a
                                         href={selectedRegistration.payment_proof_url}
                                         target="_blank"
@@ -729,7 +1057,6 @@ export default function AdminPage() {
                                         <Eye size={16} /> Ver Justificante
                                     </a>
                                 ) : (
-
                                     <span className="text-gray-500 text-sm font-bold">No adjuntado</span>
                                 )}
                             </div>
@@ -832,7 +1159,7 @@ export default function AdminPage() {
                                                     <td className="p-3 font-bold text-white">{reg.group_name}</td>
                                                     <td className="p-3 text-sm text-gray-300">{reg.category}</td>
                                                     <td className="p-3 text-center">
-                                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${reg.status === 'submitted' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                                        <span className={`text - [10px] font - black uppercase px - 2 py - 0.5 rounded - full ${reg.status === 'submitted' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'} `}>
                                                             {reg.status === 'submitted' ? 'Enviado' : 'Borrador'}
                                                         </span>
                                                     </td>

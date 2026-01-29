@@ -1,11 +1,12 @@
 "use server";
 
 import { Resend } from 'resend';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendRegistrationEmail(registrationId: string) {
+    const supabase = await createClient();
     if (!process.env.RESEND_API_KEY) {
         console.warn("RESEND_API_KEY is missing. Email notification skipped.");
         return { success: false, error: "Missing API Key" };

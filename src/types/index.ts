@@ -8,6 +8,7 @@ export interface Seat {
     status: 'available' | 'sold' | 'reserved' | 'blocked';
     type: 'standard' | 'pmr';
     price?: number;
+    assignedTo?: string;
 }
 
 export interface Order {
@@ -35,6 +36,7 @@ export interface Registration {
     user_id?: string;
     status: 'draft' | 'submitted';
     school_name?: string;
+    updated_at?: string; // [NEW] Last modification
 }
 
 export interface RegistrationResponsible {
@@ -54,8 +56,15 @@ export interface RegistrationParticipant {
     surnames: string;
     dob: string; // YYYY-MM-DD
     num_tickets: number;
-    authorization_url?: string;
-    dni_url?: string; // [NEW] DNI Upload
+    authorization_url?: string; // @deprecated
+    dni_url?: string; // @deprecated
+    tutor_dni_url?: string; // @deprecated
+    file_urls?: string[]; // @deprecated
+
+    // New Structured Files
+    authorization_urls?: string[];
+    dni_urls?: string[];
+    authorized_dni_urls?: string[];
 }
 
 export interface Ticket {
@@ -75,4 +84,14 @@ export interface Session {
     date: string;
     totalSeats: number;
     soldCount: number;
+}
+
+export interface Profile {
+    id: string;
+    school_name: string;
+    rep_name: string;
+    rep_surnames: string;
+    phone: string;
+    email: string;
+    is_approved?: boolean;
 }

@@ -50,8 +50,14 @@ function RegistrationForm() {
     // File States (Local only, not saved to DB until upload)
     const [paymentFiles, setPaymentFiles] = useState<File[]>([]);
     const [musicFile, setMusicFile] = useState<File | null>(null);
-    const [participantAuthFiles, setParticipantAuthFiles] = useState<{ [key: number]: File }>({});
-    const [participantDniFiles, setParticipantDniFiles] = useState<{ [key: number]: File }>({});
+    const [participantFiles, setParticipantFiles] = useState<{
+        [key: number]: {
+            authorization: File[],
+            dni: File[],
+            authorizedDni: File[]
+        }
+    }>({});
+
     const [responsibleDniFiles, setResponsibleDniFiles] = useState<{ [key: number]: File[] }>({}); // Changed to File[]
 
     useEffect(() => {
@@ -62,6 +68,18 @@ function RegistrationForm() {
                 return;
             }
             setUserId(user.id);
+
+            // Fetch profile for school name
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('school_name')
+                .eq('id', user.id)
+                .single();
+
+            if (profile && profile.school_name && !registrationIdParam) {
+                setSchoolName(profile.school_name);
+            }
+
             if (registrationIdParam) {
                 loadRegistration(registrationIdParam);
             } else {
@@ -154,13 +172,9 @@ function RegistrationForm() {
     const removeParticipant = (index: number) => {
         setParticipants(participants.filter((_, i) => i !== index));
 
-        const newAuthFiles = { ...participantAuthFiles };
-        delete newAuthFiles[index];
-        setParticipantAuthFiles(newAuthFiles);
-
-        const newDniFiles = { ...participantDniFiles };
-        delete newDniFiles[index];
-        setParticipantDniFiles(newDniFiles);
+        const newFiles = { ...participantFiles };
+        delete newFiles[index];
+        setParticipantFiles(newFiles);
     };
 
     const updateParticipant = (index: number, field: keyof RegistrationParticipant, value: any) => {
@@ -170,12 +184,37 @@ function RegistrationForm() {
         setParticipants(newList);
     };
 
-    const handleParticipantAuthFileChange = (index: number, file: File) => {
-        setParticipantAuthFiles(prev => ({ ...prev, [index]: file }));
+    const handleParticipantFilesChange = (index: number, type: 'authorization' | 'dni' | 'authorizedDni', newFiles: FileList | null) => {
+        if (!newFiles) return;
+        setParticipantFiles(prev => {
+            const participantData = prev[index] || { authorization: [], dni: [], authorizedDni: [] };
+            const existingFiles = participantData[type] || [];
+
+            return {
+                ...prev,
+                [index]: {
+                    ...participantData,
+                    [type]: [...existingFiles, ...Array.from(newFiles)]
+                }
+            };
+        });
     };
 
-    const handleParticipantDniFileChange = (index: number, file: File) => {
-        setParticipantDniFiles(prev => ({ ...prev, [index]: file }));
+    const removeParticipantFile = (participantIndex: number, type: 'authorization' | 'dni' | 'authorizedDni', fileIndex: number) => {
+        setParticipantFiles(prev => {
+            const participantData = prev[participantIndex];
+            if (!participantData) return prev;
+
+            const newFiles = participantData[type].filter((_, i) => i !== fileIndex);
+
+            return {
+                ...prev,
+                [participantIndex]: {
+                    ...participantData,
+                    [type]: newFiles
+                }
+            };
+        });
     };
 
     const handleResponsibleDniFileChange = (index: number, newFiles: FileList | null) => {
@@ -251,7 +290,8 @@ function RegistrationForm() {
                 music_file_url: currentMusicUrl,
                 notes,
                 status: finalStatus,
-                user_id: userId
+                user_id: userId,
+                updated_at: new Date().toISOString()
             };
 
             let currentRegId = registrationId;
@@ -274,7 +314,9 @@ function RegistrationForm() {
             }
 
             // 3. Upsert Responsibles
-            await supabase.from('registration_responsibles').delete().eq('registration_id', currentRegId);
+            const { error: delRespErr } = await supabase.from('registration_responsibles').delete().eq('registration_id', currentRegId);
+            if (delRespErr) throw delRespErr;
+
             if (responsibles.length > 0) {
                 const responsiblesWithFiles = await Promise.all(responsibles.map(async (r, idx) => {
                     // Upload new files
@@ -308,27 +350,47 @@ function RegistrationForm() {
             }
 
             // 4. Upsert Participants
+            // 4. Upsert Participants
             const participantsWithUrls = await Promise.all(participants.map(async (p, idx) => {
-                let authUrl = p.authorization_url || null;
-                if (participantAuthFiles[idx]) {
-                    authUrl = await uploadFile(participantAuthFiles[idx], 'authorizations');
-                }
+                const participantUploads = participantFiles[idx] || { authorization: [], dni: [], authorizedDni: [] };
 
-                let dniUrl = p.dni_url || null;
-                if (participantDniFiles[idx]) {
-                    dniUrl = await uploadFile(participantDniFiles[idx], 'dnis');
-                }
+                // Helper to upload list of files
+                const uploadList = async (files: File[], folder: string) => {
+                    const urls: string[] = [];
+                    for (const file of files) {
+                        const url = await uploadFile(file, folder);
+                        urls.push(url);
+                    }
+                    return urls;
+                };
 
-                const { id, ...rest } = p;
+                // Upload new files
+                const newAuthUrls = await uploadList(participantUploads.authorization || [], 'participants/auth');
+                const newDniUrls = await uploadList(participantUploads.dni || [], 'participants/dni');
+                const newAuthDniUrls = await uploadList(participantUploads.authorizedDni || [], 'participants/auth_dni');
+
+                // Combine with existing (preserving previous URLs)
+                const finalAuthUrls = [...(p.authorization_urls || []), ...newAuthUrls];
+                const finalDniUrls = [...(p.dni_urls || []), ...newDniUrls];
+                const finalAuthDniUrls = [...(p.authorized_dni_urls || []), ...newAuthDniUrls];
+
+                // Fix for invalid input syntax for type date: ""
+                const dob = p.dob === "" ? null : p.dob;
+
+                const { id, authorization_url, dni_url, tutor_dni_url, file_urls, ...rest } = p;
+
                 return {
                     ...rest,
+                    dob,
                     registration_id: currentRegId,
-                    authorization_url: authUrl,
-                    dni_url: dniUrl
+                    authorization_urls: finalAuthUrls,
+                    dni_urls: finalDniUrls,
+                    authorized_dni_urls: finalAuthDniUrls
                 };
             }));
 
-            await supabase.from('registration_participants').delete().eq('registration_id', currentRegId);
+            const { error: delPartErr } = await supabase.from('registration_participants').delete().eq('registration_id', currentRegId);
+            if (delPartErr) throw delPartErr;
             if (participantsWithUrls.length > 0) {
                 const { error: partErr } = await supabase
                     .from('registration_participants')
@@ -345,8 +407,7 @@ function RegistrationForm() {
                 alert("Borrador guardado correctamente.");
                 // Reset file states locally to avoid re-uploading duplicateLogic if user clicks save again immediately
                 setPaymentFiles([]);
-                setParticipantAuthFiles({});
-                setParticipantDniFiles({});
+                setParticipantFiles({});
                 setResponsibleDniFiles({});
                 // Reload to sync state
                 loadRegistration(currentRegId!);
@@ -618,8 +679,8 @@ function RegistrationForm() {
                                     <thead>
                                         <tr className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider border-b border-white/10">
                                             <th className="p-4 font-medium">Datos Básicos</th>
-                                            <th className="p-4 font-medium text-center">Entradas</th>
-                                            <th className="p-4 font-medium text-center">Archivos / Autorización</th>
+                                            <th className="p-4 font-medium text-center">Datos / Entradas</th>
+                                            <th className="p-4 font-medium text-center">Documentación</th>
                                             <th className="p-4"></th>
                                         </tr>
                                     </thead>
@@ -661,40 +722,83 @@ function RegistrationForm() {
                                                     />
                                                 </td>
                                                 <td className="p-4 align-top">
-                                                    <div className="flex flex-col gap-2">
-                                                        <label className="cursor-pointer inline-flex items-center gap-2 group/upload">
-                                                            <div className={`p-1.5 rounded-lg border border-dashed transition-all ${participantAuthFiles[idx] || p.authorization_url ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]' : 'border-white/20 text-gray-500 hover:border-white/40 hover:text-white'}`}>
-                                                                {participantAuthFiles[idx] || p.authorization_url ? <FileText size={16} /> : <Upload size={16} />}
-                                                            </div>
-                                                            <span className="text-[10px] text-gray-500 max-w-[80px] truncate">
-                                                                {participantAuthFiles[idx] ? participantAuthFiles[idx].name : (p.authorization_url ? "Auth. OK" : "Autorización")}
-                                                            </span>
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*,.pdf"
-                                                                className="hidden"
-                                                                onChange={(e) => {
-                                                                    if (e.target.files?.[0]) handleParticipantAuthFileChange(idx, e.target.files[0]);
-                                                                }}
-                                                            />
-                                                        </label>
+                                                    <div className="flex flex-col gap-4">
 
-                                                        <label className="cursor-pointer inline-flex items-center gap-2 group/upload">
-                                                            <div className={`p-1.5 rounded-lg border border-dashed transition-all ${participantDniFiles[idx] || p.dni_url ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]' : 'border-white/20 text-gray-500 hover:border-white/40 hover:text-white'}`}>
-                                                                {participantDniFiles[idx] || p.dni_url ? <CreditCard size={16} /> : <Upload size={16} />}
-                                                            </div>
-                                                            <span className="text-[10px] text-gray-500 max-w-[80px] truncate">
-                                                                {participantDniFiles[idx] ? participantDniFiles[idx].name : (p.dni_url ? "DNI OK" : "Subir DNI")}
-                                                            </span>
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*,.pdf"
-                                                                className="hidden"
-                                                                onChange={(e) => {
-                                                                    if (e.target.files?.[0]) handleParticipantDniFileChange(idx, e.target.files[0]);
-                                                                }}
-                                                            />
-                                                        </label>
+                                                        {/* 1. AUTORIZACIÓN */}
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">Autorización</p>
+                                                            {/* Existing */}
+                                                            {p.authorization_urls && p.authorization_urls.map((url, i) => (
+                                                                <a key={`auth-exist-${i}`} href={url} target="_blank" className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded mb-1 flex items-center gap-1 border border-green-500/20">
+                                                                    <CheckCircle2 size={10} /> Subido
+                                                                </a>
+                                                            ))}
+                                                            {/* Pending */}
+                                                            {participantFiles[idx]?.authorization?.map((file, fIdx) => (
+                                                                <div key={`auth-new-${fIdx}`} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 mb-1">
+                                                                    <span className="text-[10px] truncate max-w-[80px] text-blue-200">{file.name}</span>
+                                                                    <button type="button" onClick={() => removeParticipantFile(idx, 'authorization', fIdx)} className="text-red-400 hover:text-red-300">
+                                                                        <Trash2 size={10} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                            <label className="cursor-pointer inline-flex items-center gap-1 bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded text-[10px] transition-colors">
+                                                                <Upload size={10} className="text-[var(--primary)]" />
+                                                                <span>Añadir</span>
+                                                                <input type="file" multiple accept=".pdf,image/*" className="hidden" onChange={(e) => handleParticipantFilesChange(idx, 'authorization', e.target.files)} />
+                                                            </label>
+                                                        </div>
+
+                                                        {/* 2. DNI */}
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">DNI</p>
+                                                            {/* Existing */}
+                                                            {p.dni_urls && p.dni_urls.map((url, i) => (
+                                                                <a key={`dni-exist-${i}`} href={url} target="_blank" className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded mb-1 flex items-center gap-1 border border-green-500/20">
+                                                                    <CheckCircle2 size={10} /> Subido
+                                                                </a>
+                                                            ))}
+                                                            {/* Pending */}
+                                                            {participantFiles[idx]?.dni?.map((file, fIdx) => (
+                                                                <div key={`dni-new-${fIdx}`} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 mb-1">
+                                                                    <span className="text-[10px] truncate max-w-[80px] text-blue-200">{file.name}</span>
+                                                                    <button type="button" onClick={() => removeParticipantFile(idx, 'dni', fIdx)} className="text-red-400 hover:text-red-300">
+                                                                        <Trash2 size={10} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                            <label className="cursor-pointer inline-flex items-center gap-1 bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded text-[10px] transition-colors">
+                                                                <Upload size={10} className="text-[var(--primary)]" />
+                                                                <span>Añadir</span>
+                                                                <input type="file" multiple accept=".pdf,image/*" className="hidden" onChange={(e) => handleParticipantFilesChange(idx, 'dni', e.target.files)} />
+                                                            </label>
+                                                        </div>
+
+                                                        {/* 3. DNI AUTORIZADO */}
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wider">DNI Autorizado</p>
+                                                            {/* Existing */}
+                                                            {p.authorized_dni_urls && p.authorized_dni_urls.map((url, i) => (
+                                                                <a key={`authdni-exist-${i}`} href={url} target="_blank" className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded mb-1 flex items-center gap-1 border border-green-500/20">
+                                                                    <CheckCircle2 size={10} /> Subido
+                                                                </a>
+                                                            ))}
+                                                            {/* Pending */}
+                                                            {participantFiles[idx]?.authorizedDni?.map((file, fIdx) => (
+                                                                <div key={`authdni-new-${fIdx}`} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 mb-1">
+                                                                    <span className="text-[10px] truncate max-w-[80px] text-blue-200">{file.name}</span>
+                                                                    <button type="button" onClick={() => removeParticipantFile(idx, 'authorizedDni', fIdx)} className="text-red-400 hover:text-red-300">
+                                                                        <Trash2 size={10} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                            <label className="cursor-pointer inline-flex items-center gap-1 bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded text-[10px] transition-colors">
+                                                                <Upload size={10} className="text-[var(--primary)]" />
+                                                                <span>Añadir</span>
+                                                                <input type="file" multiple accept=".pdf,image/*" className="hidden" onChange={(e) => handleParticipantFilesChange(idx, 'authorizedDni', e.target.files)} />
+                                                            </label>
+                                                        </div>
+
                                                     </div>
                                                 </td>
                                                 <td className="p-4 align-top text-center">

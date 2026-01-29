@@ -32,38 +32,30 @@ export default function SignupPage() {
         }
 
         try {
-            // 1. Auth Signup
+            // 1. Auth Signup with Metadata (Trigger receives this)
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/login`,
+                    emailRedirectTo: `${window.location.origin}/auth/callback`, // Point to our new route
+                    data: {
+                        school_name: schoolName,
+                        rep_name: repName,
+                        rep_surnames: repSurnames,
+                        rep_phone: repPhone
+                    }
                 },
             });
 
             if (authError) throw authError;
             if (!authData.user) throw new Error("No se pudo crear el usuario");
 
-            // 2. Insert Profile Data
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .insert([{
-                    id: authData.user.id,
-                    school_name: schoolName,
-                    rep_name: repName,
-                    rep_surnames: repSurnames,
-                    rep_email: email,
-                    rep_phone: repPhone
-                }]);
-
-            if (profileError) {
-                console.error("Profile insert failed:", profileError);
-                // We don't throw here to avoid showing a confusing error if auth succeeded but profile failed 
-                // (though ideally we'd use a transaction or RPC)
-            }
+            // Profile creation is now handled by the DB trigger using the metadata above.
+            // No need for manual insert here.
 
             setSuccess(true);
         } catch (err: any) {
+            console.error(err);
             setError(err.message || "Error al registrarse");
         } finally {
             setLoading(false);

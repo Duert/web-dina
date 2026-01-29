@@ -170,11 +170,16 @@ function settingsForSeat(seat: Seat, selected: boolean) {
 
 function SeatButton({ seat, selected, onSeatToggle, readonly }: { seat: Seat, selected: boolean, onSeatToggle?: (s: Seat, e: React.MouseEvent) => void, readonly: boolean }) {
     const isSold = seat.status === 'sold';
+    const isReserved = seat.status === 'reserved';
+
+    // Allow clicking if available OR reserved (to unassign)
+    const isDisabled = (seat.status !== 'available' && seat.status !== 'reserved') || readonly;
+
     return (
         <button
-            disabled={seat.status !== 'available' || readonly}
+            disabled={isDisabled}
             onClick={(e) => !readonly && onSeatToggle && onSeatToggle(seat, e)}
-            title={`${seat.zone} - Fila ${seat.row} | Asiento ${seat.number}`}
+            title={`${seat.zone} - Fila ${seat.row} | Asiento ${seat.number}${seat.assignedTo ? `\nAsignado a: ${seat.assignedTo}` : ''}${seat.status === 'blocked' ? '\nBLOQUEADO (Organización)' : ''}`}
             className={cn(
                 "w-6 h-6 flex items-center justify-center text-[9px] font-bold transition-all duration-200 rounded-[2px] shrink-0 select-none",
                 settingsForSeat(seat, selected)

@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
     Plus,
+    Upload,
+    Save,
+    MapPin,
     FileText,
     CheckCircle2,
     Clock,
@@ -15,20 +18,23 @@ import {
     Loader2,
     Building2,
     Settings,
-    ShieldCheck
+    ShieldCheck,
+    Trash2,
+    AlertTriangle
 } from "lucide-react";
-import { Registration } from "@/types";
-import { updateProfile } from "@/app/actions";
+import { Registration, Profile } from "@/types";
+import { updateProfile, deleteRegistrationAction, deleteUserAccount } from "@/app/actions";
 import { useFormState } from "react-dom"; // Use experimental hook if available or implement wrapper. 
 // Standard in Next 14 is useFormState from react-dom
 import { useRef } from "react";
 
 export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false); // Make sure this exists
     const router = useRouter();
 
     // Server Action State for Edit Profile
@@ -41,9 +47,14 @@ export default function DashboardPage() {
             if (user) loadProfile(user.id);
             alert("Perfil actualizado correctamente"); // Simple feedback
         } else if (editState?.message) {
-            alert(editState.message);
+            if (editState.message === "No autenticado") {
+                alert("Tu sesión ha expirado. Por favor, inicia sesión de nuevo.");
+                router.push("/login");
+            } else {
+                alert(editState.message);
+            }
         }
-    }, [editState, user]);
+    }, [editState, user, router]);
 
     const loadProfile = async (uid: string) => {
         const { data: profileData } = await supabase
@@ -51,6 +62,9 @@ export default function DashboardPage() {
             .select('*')
             .eq('id', uid)
             .single();
+
+
+
         setProfile(profileData);
     };
 
@@ -222,8 +236,28 @@ export default function DashboardPage() {
                                             Click para {reg.status === 'submitted' ? 'ver' : 'continuar'}
                                         </p>
                                     </div>
-                                    <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-all text-gray-600">
-                                        <ChevronRight size={20} />
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (confirm("¿Estás seguro de que quieres BORRAR este borrador? No se puede deshacer.")) {
+                                                    const res = await deleteRegistrationAction(reg.id!);
+                                                    if (res.success) {
+                                                        alert("Borrador eliminado.");
+                                                        fetchRegistrations(user.id);
+                                                    } else {
+                                                        alert("Error: " + res.message);
+                                                    }
+                                                }
+                                            }}
+                                            className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-gray-600 z-10"
+                                            title="Borrar Borrador"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                        <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-all text-gray-600">
+                                            <ChevronRight size={20} />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -300,14 +334,38 @@ export default function DashboardPage() {
                                 >
                                     Cancelar
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="bg-[var(--primary)] text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-pink-600 transition-colors shadow-lg shadow-pink-500/20"
-                                >
+                                <button type="submit" disabled={isSaving} className="w-full bg-[var(--primary)] text-white py-3 rounded-xl font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-2">
+                                    {isSaving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
                                     Guardar Cambios
                                 </button>
                             </div>
                         </form>
+
+                        <div className="mt-8 pt-8 border-t border-white/10">
+                            <h3 className="text-red-500 font-bold mb-4 flex items-center gap-2">
+                                <AlertTriangle size={20} /> ZONA DE PELIGRO
+                            </h3>
+                            <button
+                                onClick={async () => {
+                                    const confirmText = prompt("Para confirmar, escribe ELIMINAR:");
+                                    if (confirmText === "ELIMINAR") {
+                                        const res = await deleteUserAccount();
+                                        if (res.success) {
+                                            alert("Tu cuenta ha sido eliminada.");
+                                            window.location.href = "/";
+                                        } else {
+                                            alert("Error: " + res.message);
+                                        }
+                                    }
+                                }}
+                                className="w-full border border-red-500/50 text-red-500 py-3 rounded-xl font-bold hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                            >
+                                <Trash2 size={20} /> Eliminar mi Cuenta
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2 text-center">
+                                Esta acción es irreversible. Se borrarán todos tus datos e inscripciones.
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}
