@@ -39,17 +39,17 @@ export function LocationModal({ isOpen, onClose }: LocationModalProps) {
                         <div className="w-full md:w-1/3 p-8 flex flex-col gap-6 border-b md:border-b-0 md:border-r border-white/10 bg-black/40">
                             <div>
                                 <h2 className="text-2xl font-black text-white leading-tight mb-2">
-                                    Auditorio Leopoldo Peñaroja
+                                    Teatro Municipal Carmen Tur
                                 </h2>
                                 <p className="text-[var(--primary)] font-medium flex items-center gap-2">
-                                    <MapPin size={16} /> La Vall d'Uixó
+                                    <MapPin size={16} /> La Vall d&apos;Uixó
                                 </p>
                             </div>
 
                             <div className="space-y-4 text-sm text-gray-400">
                                 <p>
-                                    Polígono La Moleta, 1<br />
-                                    12600 La Vall d'Uixó<br />
+                                    Carrer Benigafull, 31<br />
+                                    12600 La Vall d&apos;Uixó<br />
                                     Castellón, España
                                 </p>
                             </div>
@@ -60,14 +60,10 @@ export function LocationModal({ isOpen, onClose }: LocationModalProps) {
                                 onClick={() => setShowLightbox(true)}
                             >
                                 <Image
-                                    src="/auditorium.jpg"
-                                    alt="Fachada Auditorio"
+                                    src="/teatro-carmen-tur.jpg"
+                                    alt="Fachada Teatro Carmen Tur"
                                     fill
                                     className="object-cover transition-transform duration-700 group-hover:scale-110"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://images.unsplash.com/photo-1544983849-550a6b57116b?q=80&w=1000&auto=format&fit=crop";
-                                    }}
                                 />
                                 {/* Hover Overlay with Search Icon */}
                                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
@@ -81,7 +77,7 @@ export function LocationModal({ isOpen, onClose }: LocationModalProps) {
                         {/* Right Column: Interactive Map */}
                         <div className="w-full md:w-2/3 h-[400px] md:h-auto bg-neutral-800 relative">
                             <iframe
-                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3066.456637837777!2d-0.2379984!3d39.8204145!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xd600f7a7b88888b%3A0x6b88888888888888!2sAuditori%20Leopoldo%20Pe%C3%B1arroja!5e0!3m2!1ses!2ses!4v1700000000000!5m2!1ses!2ses"
+                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3066.456637837777!2d-0.2345782!3d39.8228444!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xd600f7a7b88888b%3A0x6b88888888888888!2sTeatro+Municipal+Carmen+Tur!5e0!3m2!1ses!2ses!4v1700000000000!5m2!1ses!2ses"
                                 width="100%"
                                 height="100%"
                                 style={{ border: 0 }}
@@ -114,8 +110,8 @@ export function LocationModal({ isOpen, onClose }: LocationModalProps) {
                     </button>
                     <div className="relative w-full max-w-5xl h-auto aspect-video rounded-lg overflow-hidden ring-1 ring-white/10 shadow-2xl">
                         <Image
-                            src="/auditorium.jpg"
-                            alt="Fachada Auditorio Grande"
+                            src="/teatro-carmen-tur.jpg"
+                            alt="Fachada Teatro Carmen Tur"
                             fill
                             className="object-contain"
                             onError={(e) => {

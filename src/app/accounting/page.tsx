@@ -1,10 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { Fragment } from "react";
+import { createClient } from "@/lib/supabase-server";
 import { confirmOrderPayment, cancelOrder, cleanupExpiredOrders } from "@/app/actions";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle, XCircle, Clock, Trash2, Users } from "lucide-react";
 import ExportButton from "@/components/export-button";
 import { AdminSeatMapModal } from "@/components/admin-seat-map-modal";
-import { initialSeats } from "@/lib/data";
+import { PDFDownloadButton } from "@/components/pdf-download-button";
+import { initialSeats, sessions } from "@/lib/data";
 import { Seat } from "@/types";
 
 export const dynamic = 'force-dynamic';
@@ -18,29 +21,174 @@ export default async function AccountingPage() {
             return <div className="p-8 text-center text-red-500">Error: Faltan las credenciales de administrador (Service Role Key).</div>;
         }
 
-        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey, {
             auth: { autoRefreshToken: false, persistSession: false }
         });
 
         // Fetch all data in parallel using Admin privileges
-        const [ordersResult, ticketsResult] = await Promise.all([
+        // Fetch tickets using pagination to bypass the 1000/5000 row limits
+        const fetchAllTickets = async () => {
+            let allTickets: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+            while (hasMore) {
+                const { data, error } = await supabaseAdmin
+                    .from('tickets')
+                    .select('*')
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+                if (error) throw error;
+                if (data && data.length > 0) {
+                    allTickets = [...allTickets, ...data];
+                    if (data.length < pageSize) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+                page++;
+            }
+            return { data: allTickets, error: null };
+        };
+
+        const [ordersResult, ticketsResult, registrationsResult] = await Promise.all([
             supabaseAdmin.from('orders').select('*').order('created_at', { ascending: false }),
-            supabaseAdmin.from('tickets').select('*')
+            fetchAllTickets(),
+            supabaseAdmin.from('registrations')
+                .select('*, registration_participants(*)')
         ]);
 
         if (ordersResult.error) throw ordersResult.error;
         if (ticketsResult.error) throw ticketsResult.error;
+        if (registrationsResult.error) throw registrationsResult.error;
 
         const orders = ordersResult.data;
         const tickets = ticketsResult.data;
+        const registrations = registrationsResult.data;
 
 
-        // Order Calculations
-        const totalRevenue = orders?.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0) || 0;
-        const pendingRevenue = orders?.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + o.total_amount, 0) || 0;
+        const PRICE_DANCER = 3.5;
+        const PRICE_TICKET = 3;
+
+        // Order Calculations (Online Sales)
+        const onlineRevenue = orders?.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0) || 0;
+        const onlinePending = orders?.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + o.total_amount, 0) || 0;
         const totalOrders = orders?.filter(o => o.payment_status === 'paid' || o.payment_status === 'pending').length || 0;
 
+        // Registration & Dancer Calculations
+        // Financials from Registrations (Detailed)
+        let dancersRevenueConfirmed = 0;
+        let dancersRevenuePending = 0;
+        let ticketsRevenueConfirmed = 0;
+        let ticketsRevenuePending = 0;
+        // Legacy total vars will be sums of these
+
+        // These will be calculated during breakdown iteration to ensure consistency
+        let totalDancers = 0;
+        let possibleDancers = 0;
+        let confirmedTickets = 0;
+        let totalTicketsAssigned = 0; // [NEW] Includes all submitted + manual (sold/assigned)
+        let possibleTickets = 0;
+
+
+
         // Session Calculations
+        // Helper to get block name
+        const getBlockName = (category: string) => {
+            const session = sessions.find(s => s.categoryRows.flat().includes(category));
+            return session ? session.name : "Desconocido";
+        };
+
+        // Aggregation for Breakdown Table
+        const breakdown: Record<string, Record<string, {
+            dancers_confirmed: number,
+            dancers_draft: number,
+            tickets_confirmed: number,
+            tickets_draft: number
+        }>> = {};
+
+        registrations?.forEach(reg => {
+            const block = getBlockName(reg.category);
+            const cat = reg.category;
+
+            if (!breakdown[block]) breakdown[block] = {};
+            if (!breakdown[block][cat]) breakdown[block][cat] = { dancers_confirmed: 0, dancers_draft: 0, tickets_confirmed: 0, tickets_draft: 0 };
+
+            const participants = reg.registration_participants?.length || 0;
+            const tickets = reg.registration_participants?.reduce((s: number, p: any) => s + (p.num_tickets || 0), 0) || 0;
+
+            const dancersVal = participants * PRICE_DANCER;
+            const ticketsVal = tickets * PRICE_TICKET;
+            // const regValue = dancersVal + ticketsVal;
+
+            if (reg.status === 'draft') {
+                breakdown[block][cat].dancers_draft += participants;
+                breakdown[block][cat].tickets_draft += tickets;
+
+                // Add to globals (Pending)
+                possibleDancers += participants;
+                possibleTickets += tickets;
+                dancersRevenuePending += dancersVal;
+                ticketsRevenuePending += ticketsVal;
+            } else {
+                breakdown[block][cat].dancers_confirmed += participants;
+                // [FIX] Include submitted tickets in breakdown count (Real Assigned)
+                breakdown[block][cat].tickets_confirmed += tickets;
+
+                // Add to globals
+                totalDancers += participants;
+                totalTicketsAssigned += tickets; // [FIX] Count for KPI card (Real Assigned)
+
+                if (reg.is_confirmed) {
+                    // Add to globals (Confirmed Revenue/Stats)
+                    confirmedTickets += tickets;
+                    dancersRevenueConfirmed += dancersVal;
+                    ticketsRevenueConfirmed += ticketsVal;
+                } else {
+                    // Submitted but not confirmed -> pending revenue
+                    dancersRevenuePending += dancersVal;
+                    ticketsRevenuePending += ticketsVal;
+                }
+            }
+        });
+
+        // Process Manual / Online Tickets (Not linked to registrations)
+        const nonRegTickets = tickets?.filter(t => !t.registration_id && t.status === 'sold') || [];
+
+        nonRegTickets.forEach(t => {
+            // Determine Block
+            const session = sessions.find(s => s.id === t.session_id);
+            const blockName = session ? session.name : "Desconocido";
+
+            // Determine Category (Fake category for breakdown)
+            const isFree = (t.price || 0) === 0;
+            const categoryName = isFree ? "Organización / Invitaciones" : "Entradas Sueltas (Web)";
+
+            if (!breakdown[blockName]) breakdown[blockName] = {};
+            if (!breakdown[blockName][categoryName]) {
+                breakdown[blockName][categoryName] = {
+                    dancers_confirmed: 0,
+                    dancers_draft: 0,
+                    tickets_confirmed: 0,
+                    tickets_draft: 0
+                };
+            }
+
+            // Increment Ticket Count
+            breakdown[blockName][categoryName].tickets_confirmed += 1;
+            confirmedTickets += 1;
+            totalTicketsAssigned += 1; // [FIX] Include manual/online in assigned count
+
+            // Revenue is NOT added here because:
+            // 1. Organization tickets match user requirement "no tienen coste".
+            // 2. Online/Paid tickets are calculated via 'onlineRevenue' (from orders table) or 'totalRevenue'.
+            // wait, totalRevenue = onlineRevenue + registrationRevenue.
+            // If these 'Venta Online' tickets correspond to orders, their money is in onlineRevenue.
+            // If they are manual sales physically paid, we might be missing them if not in 'orders'.
+            // But usually Admin manual assigns are free.
+            // Let's assume for now revenue is handled by orders/registrations.
+        });
+
+        const totalRevenue = onlineRevenue + dancersRevenueConfirmed + ticketsRevenueConfirmed;
+        const totalPending = onlinePending + dancersRevenuePending + ticketsRevenuePending;
         const processSession = (sessionId: string) => {
             const sessionTickets = tickets?.filter(t => t.session_id === sessionId) || [];
 
@@ -54,16 +202,22 @@ export default async function AccountingPage() {
             }));
 
             const soldCount = sessionTickets.filter(t => t.status === 'sold').length;
+            const blockedCount = sessionTickets.filter(t => t.status === 'blocked').length;
+            const occupiedCount = soldCount + blockedCount;
+            const availableCount = initialSeats.length - occupiedCount;
+
             // Calculate revenue from sold tickets only
             const revenue = sessionTickets
                 .filter(t => t.status === 'sold')
-                .reduce((sum, t) => sum + (t.price || 0), 0);
+                .reduce((sum, t) => sum + PRICE_TICKET, 0); // Force 3€ (PRICE_TICKET) always
 
-            return { seats, soldCount, revenue };
+            return { seats, soldCount, blockedCount, occupiedCount, availableCount, revenue };
         };
 
-        const morningStats = processSession('morning');
-        const afternoonStats = processSession('afternoon');
+        const block1Stats = processSession('block1');
+        const block2Stats = processSession('block2');
+        const block3Stats = processSession('block3');
+        const block4Stats = processSession('block4');
 
         return (
             <div className="min-h-screen bg-slate-50 p-8">
@@ -91,143 +245,305 @@ export default async function AccountingPage() {
                         </div>
                     </div>
 
-                    {/* KPI Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h3 className="text-slate-500 text-sm font-semibold uppercase">Ingresos Confirmados</h3>
-                            <p className="text-3xl font-bold text-green-600 mt-2">{totalRevenue}€</p>
+                    {/* KPI Cards: Finance */}
+                    <div className="mb-6">
+                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Métricas Financieras</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                                <h3 className="text-slate-500 text-sm font-semibold uppercase">Ingresos Confirmados</h3>
+                                <p className="text-3xl font-bold text-green-600 mt-2">{totalRevenue}€</p>
+                                <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>Bailarines:</span>
+                                        <span className="font-bold">{dancersRevenueConfirmed}€</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Entradas (Grupos):</span>
+                                        <span className="font-bold">{ticketsRevenueConfirmed}€</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Entradas (Web):</span>
+                                        <span className="font-bold">{onlineRevenue}€</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                                <h3 className="text-slate-500 text-sm font-semibold uppercase">Pendiente de Cobro</h3>
+                                <p className="text-3xl font-bold text-yellow-600 mt-2">{totalPending}€</p>
+                                <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>Bailarines (Borr/Pend):</span>
+                                        <span className="font-bold">{dancersRevenuePending}€</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Entradas (Borr/Pend):</span>
+                                        <span className="font-bold">{ticketsRevenuePending}€</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Entradas (Web Pend):</span>
+                                        <span className="font-bold">{onlinePending}€</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                                <h3 className="text-slate-500 text-sm font-semibold uppercase">Solicitudes Web</h3>
+                                <p className="text-3xl font-bold text-slate-900 mt-2">{totalOrders}</p>
+                                <p className="text-xs text-slate-400">Pedidos de entradas sueltas</p>
+                            </div>
                         </div>
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h3 className="text-slate-500 text-sm font-semibold uppercase">Pendiente de Cobro</h3>
-                            <p className="text-3xl font-bold text-yellow-600 mt-2">{pendingRevenue}€</p>
-                        </div>
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <h3 className="text-slate-500 text-sm font-semibold uppercase">Total Reservas</h3>
-                            <p className="text-3xl font-bold text-slate-900 mt-2">{totalOrders}</p>
+                    </div>
+
+                    {/* KPI Cards: Registrations & Dancers */}
+                    <div className="mb-10">
+                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Inscripciones & Bailarines</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+                                <h3 className="text-slate-500 text-[10px] font-bold uppercase">Bailarines Inscritos</h3>
+                                <p className="text-2xl font-black text-slate-900 mt-1">{totalDancers}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Enviados (no borrador)</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-200">
+                                <h3 className="text-slate-500 text-[10px] font-bold uppercase">Bailarines Posibles</h3>
+                                <p className="text-2xl font-black text-slate-400 mt-1">{possibleDancers}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Actualmente en borrador</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-green-500">
+                                <h3 className="text-slate-500 text-sm font-bold uppercase">Entradas Asignadas</h3>
+                                <p className="text-2xl font-black text-green-600 mt-1">{totalTicketsAssigned}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Inscripciones enviadas + Sueltas</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-green-200">
+                                <h3 className="text-slate-500 text-[10px] font-bold uppercase">Entradas Posibles</h3>
+                                <p className="text-2xl font-black text-slate-400 mt-1">{possibleTickets}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Solicitadas en borrador</p>
+                            </div>
                         </div>
                     </div>
 
                     {/* Session Occupancy & Maps */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        {/* Morning Session */}
+                        {/* Morning 1 Session */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
                             <div>
                                 <h3 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
                                     <Users className="text-blue-500" />
-                                    Sesión Mañana
+                                    Bloque 1
                                 </h3>
                                 <div className="mt-4 flex justify-between items-end border-b pb-4">
-                                    <div>
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Butacas Vendidas</p>
-                                        <p className="text-4xl font-black text-slate-900 mt-1">
-                                            {morningStats.soldCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
-                                        </p>
+                                    <div className="flex gap-6">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
+                                            <p className="text-4xl font-black text-indigo-600 mt-1">
+                                                {block1Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col justify-end pb-1.5">
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block1Stats.occupiedCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block1Stats.soldCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block1Stats.blockedCount}</span></p>
+                                        </div>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
-                                        <p className="text-xl font-bold text-green-600">{morningStats.revenue}€</p>
+                                        <p className="text-xl font-bold text-green-600">{block1Stats.revenue}€</p>
                                     </div>
                                 </div>
                             </div>
                             <AdminSeatMapModal
-                                sessionName="Sesión Mañana (10:00h)"
-                                seats={morningStats.seats}
-                                stats={{ sold: morningStats.soldCount, total: initialSeats.length, revenue: morningStats.revenue }}
+                                sessionId="block1"
+                                sessionName="Bloque 1"
+                                seats={block1Stats.seats}
+                                stats={{ sold: block1Stats.soldCount, blocked: block1Stats.blockedCount, occupied: block1Stats.occupiedCount, available: block1Stats.availableCount, total: initialSeats.length, revenue: block1Stats.revenue }}
+                            />
+                            <PDFDownloadButton
+                                sessionId="block1"
+                                sessionName="Bloque 1"
+                                seats={block1Stats.seats}
                             />
                         </div>
 
-                        {/* Afternoon Session */}
+                        {/* Morning 2 Session */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
+                                    <Users className="text-blue-500" />
+                                    Bloque 2
+                                </h3>
+                                <div className="mt-4 flex justify-between items-end border-b pb-4">
+                                    <div className="flex gap-6">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
+                                            <p className="text-4xl font-black text-indigo-600 mt-1">
+                                                {block2Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col justify-end pb-1.5">
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block2Stats.occupiedCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block2Stats.soldCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block2Stats.blockedCount}</span></p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
+                                        <p className="text-xl font-bold text-green-600">{block2Stats.revenue}€</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <AdminSeatMapModal
+                                sessionId="block2"
+                                sessionName="Bloque 2"
+                                seats={block2Stats.seats}
+                                stats={{ sold: block2Stats.soldCount, blocked: block2Stats.blockedCount, occupied: block2Stats.occupiedCount, available: block2Stats.availableCount, total: initialSeats.length, revenue: block2Stats.revenue }}
+                            />
+                            <PDFDownloadButton
+                                sessionId="block2"
+                                sessionName="Bloque 2"
+                                seats={block2Stats.seats}
+                            />
+                        </div>
+
+                        {/* Afternoon 1 Session */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
                             <div>
                                 <h3 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
                                     <Users className="text-pink-500" />
-                                    Sesión Tarde
+                                    Bloque 3
                                 </h3>
                                 <div className="mt-4 flex justify-between items-end border-b pb-4">
-                                    <div>
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Butacas Vendidas</p>
-                                        <p className="text-4xl font-black text-slate-900 mt-1">
-                                            {afternoonStats.soldCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
-                                        </p>
+                                    <div className="flex gap-6">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
+                                            <p className="text-4xl font-black text-indigo-600 mt-1">
+                                                {block3Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col justify-end pb-1.5">
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block3Stats.occupiedCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block3Stats.soldCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block3Stats.blockedCount}</span></p>
+                                        </div>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
-                                        <p className="text-xl font-bold text-green-600">{afternoonStats.revenue}€</p>
+                                        <p className="text-xl font-bold text-green-600">{block3Stats.revenue}€</p>
                                     </div>
                                 </div>
                             </div>
                             <AdminSeatMapModal
-                                sessionName="Sesión Tarde (15:30h)"
-                                seats={afternoonStats.seats}
-                                stats={{ sold: afternoonStats.soldCount, total: initialSeats.length, revenue: afternoonStats.revenue }}
+                                sessionId="block3"
+                                sessionName="Bloque 3"
+                                seats={block3Stats.seats}
+                                stats={{ sold: block3Stats.soldCount, blocked: block3Stats.blockedCount, occupied: block3Stats.occupiedCount, available: block3Stats.availableCount, total: initialSeats.length, revenue: block3Stats.revenue }}
+                            />
+                            <PDFDownloadButton
+                                sessionId="block3"
+                                sessionName="Bloque 3"
+                                seats={block3Stats.seats}
+                            />
+                        </div>
+
+                        {/* Afternoon 2 Session */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
+                                    <Users className="text-pink-500" />
+                                    Bloque 4
+                                </h3>
+                                <div className="mt-4 flex justify-between items-end border-b pb-4">
+                                    <div className="flex gap-6">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
+                                            <p className="text-4xl font-black text-indigo-600 mt-1">
+                                                {block4Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col justify-end pb-1.5">
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block4Stats.occupiedCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block4Stats.soldCount}</span></p>
+                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block4Stats.blockedCount}</span></p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
+                                        <p className="text-xl font-bold text-green-600">{block4Stats.revenue}€</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <AdminSeatMapModal
+                                sessionId="block4"
+                                sessionName="Bloque 4"
+                                seats={block4Stats.seats}
+                                stats={{ sold: block4Stats.soldCount, blocked: block4Stats.blockedCount, occupied: block4Stats.occupiedCount, available: block4Stats.availableCount, total: initialSeats.length, revenue: block4Stats.revenue }}
+                            />
+                            <PDFDownloadButton
+                                sessionId="block4"
+                                sessionName="Bloque 4"
+                                seats={block4Stats.seats}
                             />
                         </div>
                     </div>
 
-                    {/* Orders Table */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Breakdown Table */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-10">
                         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                            <h2 className="font-bold text-slate-800">Listado de Pedidos</h2>
+                            <h2 className="font-bold text-slate-800">Desglose por Bloque y Categoría</h2>
                         </div>
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase border-b">
-                                <tr>
-                                    <th className="px-6 py-3">Referencia</th>
-                                    <th className="px-6 py-3">Cliente</th>
-                                    <th className="px-6 py-3">Fecha</th>
-                                    <th className="px-6 py-3">Total</th>
-                                    <th className="px-6 py-3">Estado</th>
-                                    <th className="px-6 py-3 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {orders?.map((order) => (
-                                    <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-mono text-slate-600">{order.id.split('-')[0].toUpperCase()}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium text-slate-900">{order.customer_name}</div>
-                                            <div className="text-xs text-slate-500">{order.customer_phone}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-600">
-                                            {new Date(order.created_at).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 font-bold text-slate-900">{order.total_amount}€</td>
-                                        <td className="px-6 py-4">
-                                            <StatusBadge status={order.payment_status} />
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            {order.payment_status === 'pending' && (
-                                                <div className="flex justify-end gap-2">
-                                                    <form action={async () => {
-                                                        'use server';
-                                                        await confirmOrderPayment(order.id);
-                                                    }}>
-                                                        <button title="Confirmar Pago" className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200 transition-all">
-                                                            <CheckCircle size={18} />
-                                                        </button>
-                                                    </form>
-                                                    <form action={async () => {
-                                                        'use server';
-                                                        await cancelOrder(order.id);
-                                                    }}>
-                                                        <button title="Cancelar / Liberar" className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition-all">
-                                                            <XCircle size={18} />
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {(!orders || orders.length === 0) && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase border-b text-xs">
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                                            No hay pedidos registrados
-                                        </td>
+                                        <th className="px-6 py-3">Bloque</th>
+                                        <th className="px-6 py-3">Categoría</th>
+                                        <th className="px-6 py-3 text-center bg-blue-50/50">Bailarines<br />(Inscritos)</th>
+                                        <th className="px-6 py-3 text-center bg-blue-100/50">Bailarines<br />(Posibles/Draft)</th>
+                                        <th className="px-6 py-3 text-center bg-green-50/50">Entradas<br />(Asignadas)</th>
+                                        <th className="px-6 py-3 text-center bg-green-100/50">Entradas<br />(Posibles/Draft)</th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {Object.entries(breakdown).sort().map(([blockName, categories]) => {
+                                        // Calculate total for this block
+                                        const blockTotal = Object.values(categories).reduce((acc, curr) => ({
+                                            dancers_confirmed: acc.dancers_confirmed + curr.dancers_confirmed,
+                                            dancers_draft: acc.dancers_draft + curr.dancers_draft,
+                                            tickets_confirmed: acc.tickets_confirmed + curr.tickets_confirmed,
+                                            tickets_draft: acc.tickets_draft + curr.tickets_draft
+                                        }), { dancers_confirmed: 0, dancers_draft: 0, tickets_confirmed: 0, tickets_draft: 0 });
+
+                                        return (
+                                            <Fragment key={blockName}>
+                                                {Object.entries(categories).sort().map(([catName, stats], idx) => (
+                                                    <tr key={`${blockName}-${catName}`} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-6 py-3 font-medium text-slate-900">{blockName}</td>
+                                                        <td className="px-6 py-3 text-slate-600">{catName}</td>
+                                                        <td className="px-6 py-3 text-center font-bold text-slate-700 bg-blue-50/30">{stats.dancers_confirmed}</td>
+                                                        <td className="px-6 py-3 text-center text-slate-400 bg-blue-100/30">{stats.dancers_draft}</td>
+                                                        <td className="px-6 py-3 text-center font-bold text-green-600 bg-green-50/30">{stats.tickets_confirmed}</td>
+                                                        <td className="px-6 py-3 text-center text-slate-400 bg-green-100/30">{stats.tickets_draft}</td>
+                                                    </tr>
+                                                ))}
+                                                {/* Block Total Row */}
+                                                <tr className="bg-slate-100 font-bold border-t border-slate-200 border-b-2 border-slate-300">
+                                                    <td className="px-6 py-3 text-slate-800">{blockName}</td>
+                                                    <td className="px-6 py-3 text-slate-800 text-right uppercase text-xs tracking-wider">Total Bloque</td>
+                                                    <td className="px-6 py-3 text-center text-blue-800 bg-blue-100/50">{blockTotal.dancers_confirmed}</td>
+                                                    <td className="px-6 py-3 text-center text-blue-600 bg-blue-200/50">{blockTotal.dancers_draft}</td>
+                                                    <td className="px-6 py-3 text-center text-green-800 bg-green-100/50">{blockTotal.tickets_confirmed}</td>
+                                                    <td className="px-6 py-3 text-center text-green-600 bg-green-200/50">{blockTotal.tickets_draft}</td>
+                                                </tr>
+                                            </Fragment>
+                                        );
+                                    })}
+                                    {Object.keys(breakdown).length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                                                No hay datos para mostrar
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

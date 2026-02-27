@@ -1,5 +1,5 @@
 import React from 'react';
-import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import { Registration, RegistrationResponsible, RegistrationParticipant } from '@/types';
 
 // Create styles
@@ -142,12 +142,22 @@ export const RegistrationDocument = ({ registration }: RegistrationDocumentProps
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Datos del Grupo</Text>
                 <View style={styles.row}>
+                    <Text style={styles.label}>Nombre de la Escuela:</Text>
+                    <Text style={styles.value}>{registration.school_name || 'No especificada'}</Text>
+                </View>
+                <View style={styles.row}>
                     <Text style={styles.label}>Nombre del Grupo:</Text>
                     <Text style={styles.value}>{registration.group_name}</Text>
                 </View>
                 <View style={styles.row}>
                     <Text style={styles.label}>Categoría:</Text>
                     <Text style={styles.value}>{registration.category}</Text>
+                </View>
+                <View style={styles.row}>
+                    <Text style={styles.label}>Total Entradas Solicitadas:</Text>
+                    <Text style={styles.value}>
+                        {registration.registration_participants.reduce((sum, p) => sum + (p.num_tickets || 0), 0)}
+                    </Text>
                 </View>
             </View>
 
@@ -208,7 +218,7 @@ export const RegistrationDocument = ({ registration }: RegistrationDocumentProps
 
             {/* Footer */}
             <View style={styles.footer}>
-                <Text>Dance In Action - Campeonato Coreográfico de la Vall d'Uixó</Text>
+                <Text>Dance In Action - Campeonato Coreográfico de la Vall d&apos;Uixó</Text>
                 <Text>Generado automáticamente - {new Date().toLocaleString()}</Text>
             </View>
 

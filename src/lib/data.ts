@@ -1,85 +1,51 @@
 import { Seat, Session, Zone } from "@/types";
 
-// Explicit configuration for every row based on user's exact specification
-const ROW_DEFINITIONS = [
-    // PREFERENTE (Rows 1-9)
-    { row: 1, maxLeft: 27, maxRight: 28, zone: 'Preferente' },
-    { row: 2, maxLeft: 29, maxRight: 30, zone: 'Preferente' },
-    { row: 3, maxLeft: 31, maxRight: 32, zone: 'Preferente' },
-    { row: 4, maxLeft: 31, maxRight: 32, zone: 'Preferente' },
-    { row: 5, maxLeft: 31, maxRight: 32, zone: 'Preferente' },
-    { row: 6, maxLeft: 31, maxRight: 32, zone: 'Preferente' },
-    { row: 7, maxLeft: 31, maxRight: 32, zone: 'Preferente' },
-    { row: 8, maxLeft: 33, maxRight: 34, zone: 'Preferente' },
-    { row: 9, maxLeft: 33, maxRight: 34, zone: 'Preferente' }, // PMR are 31, 33 (L) and 32, 34 (R)
+// New Layout Configuration
+// PATI BUTAQUES: Rows 1-17
+// - Rows 1-17: 20 seats (10 | GAP | 10)
 
-    // ZONA 2 (Rows 10-18)
-    { row: 10, maxLeft: 35, maxRight: 36, zone: 'Zona 2' },
-    { row: 11, maxLeft: 35, maxRight: 36, zone: 'Zona 2' },
-    { row: 12, maxLeft: 37, maxRight: 38, zone: 'Zona 2' },
-    { row: 13, maxLeft: 37, maxRight: 38, zone: 'Zona 2' },
-    { row: 14, maxLeft: 37, maxRight: 38, zone: 'Zona 2' },
-    { row: 15, maxLeft: 39, maxRight: 38, zone: 'Zona 2' },
-    { row: 16, maxLeft: 39, maxRight: 40, zone: 'Zona 2' },
-    { row: 17, maxLeft: 39, maxRight: 40, zone: 'Zona 2' },
-    { row: 18, maxLeft: 39, maxRight: 40, zone: 'Zona 2' },
+// ANFITEATRE: Rows 18-25
+// - Rows 18-21 (Fila 1-4): 24 seats (6 | GAP | 12 | GAP | 6)
+// - Rows 22-25 (Fila 5-8): 16 seats (4 | GAP | 8 | GAP | 4)
 
-    // ZONA 3 (Rows 19-27)
-    { row: 19, maxLeft: 43, maxRight: 44, zone: 'Zona 3' },
-    { row: 20, maxLeft: 43, maxRight: 44, zone: 'Zona 3' },
-    { row: 21, maxLeft: 43, maxRight: 44, zone: 'Zona 3' },
-    { row: 22, maxLeft: 43, maxRight: 44, zone: 'Zona 3' },
-    { row: 23, maxLeft: 43, maxRight: 44, zone: 'Zona 3' },
-    { row: 24, maxLeft: 43, maxRight: 44, zone: 'Zona 3' },
-    { row: 25, maxLeft: 21, maxRight: 22, zone: 'Zona 3' },
-    { row: 26, maxLeft: 21, maxRight: 22, zone: 'Zona 3' },
-    { row: 27, maxLeft: 21, maxRight: 22, zone: 'Zona 3' },
-] as const;
+const SEAT_CONFIG = [
+    // --- PATI BUTAQUES (Main Floor) ---
+    // Zone: Preferente (Rows 1-10)
+    { startRow: 1, endRow: 10, seatsPerRow: 20, zone: 'Preferente' as Zone },
+    // Zone: Zona 2 (Rows 11-17)
+    { startRow: 11, endRow: 17, seatsPerRow: 20, zone: 'Zona 2' as Zone },
+
+    // --- ANFITEATRE (Balcony) ---
+    // Zone: Zona 3 (Rows 18-21 / Fila 1-4)
+    { startRow: 18, endRow: 21, seatsPerRow: 24, zone: 'Zona 3' as Zone },
+    // Zone: Zona 3 (Rows 22-25 / Fila 5-8)
+    { startRow: 22, endRow: 25, seatsPerRow: 16, zone: 'Zona 3' as Zone },
+];
 
 function generateSeats(): Seat[] {
     const seats: Seat[] = [];
 
-    ROW_DEFINITIONS.forEach(config => {
-        // Generate Left Side (Odds) - 1, 3, 5... up to maxLeft
-        for (let i = 1; i <= config.maxLeft; i += 2) {
-            let type: Seat['type'] = 'standard';
-            let zone = config.zone as Zone;
+    SEAT_CONFIG.forEach(config => {
+        for (let r = config.startRow; r <= config.endRow; r++) {
+            for (let n = 1; n <= config.seatsPerRow; n++) {
+                let type: Seat['type'] = 'standard';
+                let zone = config.zone;
 
-            // SPECIAL CASE: Row 9 PMR Seats (Left: 31, 33)
-            if (config.row === 9 && (i === 31 || i === 33)) {
-                type = 'pmr';
-                zone = 'PMR';
+                // PMR Logic: Row 1, Seats 1-3 and 18-20
+                if (r === 1 && (n <= 3 || n >= 18)) {
+                    type = 'pmr';
+                    zone = 'PMR';
+                }
+
+                seats.push({
+                    id: `R${r}-${n}`,
+                    zone: zone,
+                    row: r,
+                    number: n,
+                    status: 'available',
+                    type: type
+                });
             }
-
-            seats.push({
-                id: `R${config.row}-${i}`,
-                zone: zone,
-                row: config.row,
-                number: i,
-                status: 'available',
-                type: type
-            });
-        }
-
-        // Generate Right Side (Evens) - 2, 4, 6... up to maxRight
-        for (let i = 2; i <= config.maxRight; i += 2) {
-            let type: Seat['type'] = 'standard';
-            let zone = config.zone as Zone;
-
-            // SPECIAL CASE: Row 9 PMR Seats (Right: 32, 34)
-            if (config.row === 9 && (i === 32 || i === 34)) {
-                type = 'pmr';
-                zone = 'PMR';
-            }
-
-            seats.push({
-                id: `R${config.row}-${i}`,
-                zone: zone,
-                row: config.row,
-                number: i,
-                status: 'available',
-                type: type
-            });
         }
     });
 
@@ -90,17 +56,52 @@ export const initialSeats = generateSeats();
 
 export const sessions: Session[] = [
     {
-        id: 'morning',
-        name: 'Sesión Mañana',
-        date: '2026-03-01T10:00:00',
+        id: 'block1',
+        name: 'Bloque 1',
+        date: '2026-03-29T09:30:00',
         totalSeats: initialSeats.length,
-        soldCount: 0
+        soldCount: 0,
+        categoryRows: [
+            ['Infantil'],
+            ['Infantil Mini-parejas'],
+            ['Mini-Solistas Infantil']
+        ]
     },
     {
-        id: 'afternoon',
-        name: 'Sesión Tarde',
-        date: '2026-03-01T15:30:00',
+        id: 'block2',
+        name: 'Bloque 2',
+        date: '2026-03-29T11:30:00',
         totalSeats: initialSeats.length,
-        soldCount: 0
+        soldCount: 0,
+        categoryRows: [
+            ['Junior'],
+            ['Junior Mini-parejas'],
+            ['Mini-Solistas Junior']
+        ]
+    },
+    {
+        id: 'block3',
+        name: 'Bloque 3',
+        date: '2026-03-29T15:00:00',
+        totalSeats: initialSeats.length,
+        soldCount: 0,
+        categoryRows: [
+            ['Juvenil'],
+            ['Juvenil Parejas'],
+            ['Solistas Juvenil']
+        ]
+    },
+    {
+        id: 'block4',
+        name: 'Bloque 4',
+        date: '2026-03-29T17:00:00',
+        totalSeats: initialSeats.length,
+        soldCount: 0,
+        categoryRows: [
+            ['Absoluta'],
+            ['Parejas'],
+            ['Solistas Absoluta'],
+            ['Premium']
+        ]
     }
 ];

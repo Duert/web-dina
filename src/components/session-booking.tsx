@@ -10,10 +10,10 @@ import { cn } from "@/lib/utils";
 // Mock pricing - In a real app this could also come from DB
 // Updated to single price as per client request
 const PRICES = {
-    'Preferente': 5,
-    'Zona 2': 5,
-    'Zona 3': 5,
-    'PMR': 5
+    'Preferente': 3,
+    'Zona 2': 3,
+    'Zona 3': 3,
+    'PMR': 3
 };
 
 interface SessionBookingProps {
@@ -293,7 +293,7 @@ export default function SessionBooking({ session, initialSeats }: SessionBooking
                                     {selectedSeats.map(seat => (
                                         <div key={seat.id} className="bg-white p-3 rounded-lg border shadow-sm flex justification-between items-center group">
                                             <div>
-                                                <div className="font-bold text-slate-800">Fila {seat.row} - Asiento {seat.number}</div>
+                                                <div className="font-bold text-slate-800">Fila {seat.row} - Entrada {seat.number}</div>
                                                 <div className="text-xs text-slate-500 uppercase tracking-wide">{seat.zone}</div>
                                             </div>
                                             <div className="text-right">

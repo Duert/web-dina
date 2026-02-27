@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signupSchoolAction } from "@/app/actions";
 import { Lock, Mail, Loader2, ChevronLeft, Building2, User, Phone } from "lucide-react";
 
 export default function SignupPage() {
@@ -32,26 +33,36 @@ export default function SignupPage() {
         }
 
         try {
-            // 1. Auth Signup with Metadata (Trigger receives this)
-            const { data: authData, error: authError } = await supabase.auth.signUp({
+            // Import dynamically or use the imported one if we convert this component to use server actions properly.
+            // Since this is a client component, we should import the action.
+            // But checking imports... I need to import { signupSchoolAction } from "@/app/actions";
+            // I'll add the import in a separate edit or assume I can add it here if I replace the whole file or top.
+            // Wait, replace_file_content replaces a block. I need to add the import at the top too.
+            // Let's just do the fetch call logic here or import it if I added it to the imports (I didn't yet).
+
+            // Actually, better to import it at the top. 
+            // I will use replace_file_content to swap the imports and then this function.
+            // For now, let's just use the `signupSchoolAction` and I will add the import in the next step or same step if I can range it? No, imports are at top.
+
+            // I will return to the planning to add import first? 
+            // No, I can replace the imports block + function block? Too big.
+            // I'll replace the function body and assume I'll add the import next.
+
+            // WAIT, `src/app/actions.ts` is a server action file ('use server').
+            // I can import it directly in a client component.
+
+            const result = await signupSchoolAction({
                 email,
                 password,
-                options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback`, // Point to our new route
-                    data: {
-                        school_name: schoolName,
-                        rep_name: repName,
-                        rep_surnames: repSurnames,
-                        rep_phone: repPhone
-                    }
-                },
+                school_name: schoolName,
+                rep_name: repName,
+                rep_surnames: repSurnames,
+                rep_phone: repPhone
             });
 
-            if (authError) throw authError;
-            if (!authData.user) throw new Error("No se pudo crear el usuario");
-
-            // Profile creation is now handled by the DB trigger using the metadata above.
-            // No need for manual insert here.
+            if (!result.success) {
+                throw new Error(result.message);
+            }
 
             setSuccess(true);
         } catch (err: any) {
@@ -70,8 +81,8 @@ export default function SignupPage() {
                 </div>
                 <h1 className="text-3xl font-bold text-white mb-4 uppercase tracking-tighter">¡Casi listo!</h1>
                 <p className="text-gray-400 max-w-md mb-8">
-                    Te hemos enviado un enlace de confirmación a <strong>{email}</strong>.
-                    Activa tu cuenta para empezar a inscribir tus grupos.
+                    Tu cuenta ha sido creada correctamente.
+                    Ya puedes iniciar sesión con tus credenciales.
                 </p>
                 <Link href="/login" className="bg-[var(--primary)] text-white px-8 py-3 rounded-full font-bold hover:bg-pink-600 transition-all shadow-lg shadow-pink-500/20">
                     Volver al Login
@@ -105,7 +116,7 @@ export default function SignupPage() {
                                 <input
                                     required
                                     className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-[var(--primary)] outline-none transition-all"
-                                    placeholder="Ej. Academia DINA"
+                                    placeholder="Ej. Escuela DINA"
                                     value={schoolName}
                                     onChange={(e) => setSchoolName(e.target.value)}
                                 />

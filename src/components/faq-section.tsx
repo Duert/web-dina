@@ -15,19 +15,19 @@ export default function FAQSection() {
     );
 
     useEffect(() => {
+        const fetchFAQs = async () => {
+            const { data } = await supabase
+                .from('faqs')
+                .select('*')
+                .eq('visible', true)
+                .order('display_order', { ascending: true });
+
+            if (data) setFaqs(data);
+            setLoading(false);
+        };
+
         fetchFAQs();
     }, []);
-
-    const fetchFAQs = async () => {
-        const { data } = await supabase
-            .from('faqs')
-            .select('*')
-            .eq('visible', true)
-            .order('display_order', { ascending: true });
-
-        if (data) setFaqs(data);
-        setLoading(false);
-    };
 
     if (loading || faqs.length === 0) return null;
 

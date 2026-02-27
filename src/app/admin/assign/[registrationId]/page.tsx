@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { SeatMap } from "@/components/seat-map";
 import { initialSeats } from "@/lib/data";
 import { Seat, Ticket } from "@/types";
-import { ArrowLeft, Save, Lock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Lock, AlertCircle, Check, X } from "lucide-react";
+import { unassignSeatAction } from "@/app/actions-seats";
 
 // Zone Pricing Map (manual for now, matching main app)
 const ZONE_PRICES = {
@@ -14,6 +15,23 @@ const ZONE_PRICES = {
     'Zona 2': 10,
     'Zona 3': 8,
     'PMR': 12
+};
+
+// Block Definitions (matching admin panel)
+const BLOCK_DEFINITIONS: Record<string, string[]> = {
+    'Bloque 1 (Mañana 1)': ['Infantil', 'Infantil Mini-parejas', 'Mini-Solistas Infantil'],
+    'Bloque 2 (Mañana 2)': ['Junior', 'Junior Mini-parejas', 'Mini-Solistas Junior'],
+    'Bloque 3 (Tarde 1)': ['Juvenil', 'Juvenil Parejas', 'Solistas Juvenil'],
+    'Bloque 4 (Tarde 2)': ['Absoluta', 'Parejas', 'Solistas Absoluta', 'Premium'],
+};
+
+// Helper to get block from category
+const getBlockFromCategory = (category: string): 'block1' | 'block2' | 'block3' | 'block4' => {
+    if (BLOCK_DEFINITIONS['Bloque 1 (Mañana 1)'].includes(category)) return 'block1';
+    if (BLOCK_DEFINITIONS['Bloque 2 (Mañana 2)'].includes(category)) return 'block2';
+    if (BLOCK_DEFINITIONS['Bloque 3 (Tarde 1)'].includes(category)) return 'block3';
+    if (BLOCK_DEFINITIONS['Bloque 4 (Tarde 2)'].includes(category)) return 'block4';
+    return 'block1'; // default
 };
 
 export default function AssignSeatsPage({ params }: { params: Promise<{ registrationId: string }> }) {
@@ -28,11 +46,12 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
 
     // Data State
     const [registration, setRegistration] = useState<any>(null);
-    const [session, setSession] = useState<'morning' | 'afternoon'>('morning');
+    const [session, setSession] = useState<'block1' | 'block2' | 'block3' | 'block4'>('block1');
     const [existingTickets, setExistingTickets] = useState<Ticket[]>([]);
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [quickSelectCount, setQuickSelectCount] = useState<string>("");
 
     // 1. Auth Check (Simple PIN)
     const handleLogin = (e: React.FormEvent) => {
@@ -58,9 +77,9 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
             if (error) throw error;
             setRegistration(data);
 
-            // Heuristic to guess session (optional, defaults to morning)
-            if (data.category && ['Juvenil', 'Absoluta', 'Premium', 'Parejas'].includes(data.category)) {
-                setSession('afternoon');
+            // Auto-detect block from category
+            if (data.category) {
+                setSession(getBlockFromCategory(data.category));
             }
 
         } catch (err) {
@@ -117,7 +136,10 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
         if (seat.status === 'reserved') {
             if (confirm(`¿Desasignar asiento ${seat.id}?`)) {
                 setLoading(true); // temporary loading state
-                await supabase.from('tickets').delete().eq('session_id', session).eq('seat_id', seat.id);
+                const res = await unassignSeatAction(session, seat.id);
+                if (!res.success) {
+                    alert("Error al desasignar: " + res.error);
+                }
                 // Refresh
                 const { data } = await supabase.from('tickets').select('*').eq('session_id', session);
                 if (data) setExistingTickets(data);
@@ -188,7 +210,89 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
         }
     };
 
-    // 6. Save Logic
+    // 6. Auto-Fill Logic
+    const handleAutoFill = () => {
+        const requestedCount = registration?.registration_participants?.reduce((sum: number, p: any) => sum + (p.num_tickets || 0), 0) || 0;
+        const assignedCount = existingTickets.filter(t => t.registration_id === registrationId).length;
+        const remaining = requestedCount - assignedCount - selectedSeats.length;
+
+        if (remaining <= 0) {
+            alert("Ya tienes todas las butacas necesarias asignadas o seleccionadas.");
+            return;
+        }
+
+        const availableSeats = computedSeats.filter(s => s.status === 'available' && !selectedSeats.some(sel => sel.id === s.id));
+        const toSelect = availableSeats.slice(0, remaining);
+
+        if (toSelect.length < remaining) {
+            const blockedCount = computedSeats.filter(s => s.status === 'blocked').length;
+            const message = blockedCount > 0
+                ? `Solo hay ${toSelect.length} butacas disponibles de las ${remaining} que necesitas (${blockedCount} bloqueadas). ¿Seleccionar las disponibles?`
+                : `Solo hay ${toSelect.length} butacas disponibles de las ${remaining} que necesitas. ¿Seleccionar las disponibles?`;
+            if (!confirm(message)) {
+                return;
+            }
+        }
+
+        setSelectedSeats(prev => [...prev, ...toSelect]);
+    };
+
+    // 7. Quick Select by Number
+    const handleQuickSelect = () => {
+        const count = parseInt(quickSelectCount);
+        if (isNaN(count) || count <= 0) {
+            alert("Introduce un número válido");
+            return;
+        }
+
+        const requestedCount = registration?.registration_participants?.reduce((sum: number, p: any) => sum + (p.num_tickets || 0), 0) || 0;
+        const assignedCount = existingTickets.filter(t => t.registration_id === registrationId).length;
+        const maxAllowed = requestedCount - assignedCount - selectedSeats.length;
+
+        if (count > maxAllowed) {
+            alert(`Solo puedes seleccionar ${maxAllowed} butacas más.`);
+            return;
+        }
+
+        const availableSeats = computedSeats.filter(s => s.status === 'available' && !selectedSeats.some(sel => sel.id === s.id));
+        const toSelect = availableSeats.slice(0, count);
+
+        if (toSelect.length < count) {
+            alert(`Solo hay ${toSelect.length} butacas disponibles (sin contar bloqueadas).`);
+        }
+
+        setSelectedSeats(prev => [...prev, ...toSelect]);
+        setQuickSelectCount("");
+    };
+
+    // 8. Select by Zone
+    const handleSelectZone = (zone: string) => {
+        const requestedCount = registration?.registration_participants?.reduce((sum: number, p: any) => sum + (p.num_tickets || 0), 0) || 0;
+        const assignedCount = existingTickets.filter(t => t.registration_id === registrationId).length;
+        const maxAllowed = requestedCount - assignedCount - selectedSeats.length;
+
+        if (maxAllowed <= 0) {
+            alert("Ya tienes todas las butacas necesarias.");
+            return;
+        }
+
+        const zoneSeats = computedSeats.filter(s => s.status === 'available' && s.zone === zone && !selectedSeats.some(sel => sel.id === s.id));
+        const toSelect = zoneSeats.slice(0, maxAllowed);
+
+        if (toSelect.length === 0) {
+            alert(`No hay butacas disponibles en ${zone}`);
+            return;
+        }
+
+        setSelectedSeats(prev => [...prev, ...toSelect]);
+    };
+
+    // 9. Deselect All
+    const handleDeselectAll = () => {
+        setSelectedSeats([]);
+    };
+
+    // 10. Save Logic
     const handleSave = async () => {
         if (selectedSeats.length === 0) return;
         setSaving(true);
@@ -207,7 +311,7 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
 
             if (error) throw error;
 
-            alert("Asientos asignados correctamente");
+            alert("Entradas asignadas correctamente");
             setSelectedSeats([]);
             // Refresh tickets
             const { data } = await supabase.from('tickets').select('*').eq('session_id', session);
@@ -219,6 +323,28 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
             setSaving(false);
         }
     };
+
+    // 11. Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            // Only trigger if not typing in an input
+            if (e.target instanceof HTMLInputElement) return;
+
+            if (e.key === 'a' || e.key === 'A') {
+                e.preventDefault();
+                handleAutoFill();
+            } else if (e.key === 'd' || e.key === 'D') {
+                e.preventDefault();
+                handleDeselectAll();
+            } else if (e.key === 's' || e.key === 'S') {
+                e.preventDefault();
+                handleSave();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [selectedSeats, registration, existingTickets]);
 
     if (!isAuthenticated) {
         return (
@@ -262,22 +388,37 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
                     {/* Session Toggle */}
                     <div className="flex bg-black rounded-lg p-1 border border-white/10">
                         <button
-                            onClick={() => setSession('morning')}
-                            className={`px-4 py-1 rounded text-sm font-bold transition-colors ${session === 'morning' ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
+                            onClick={() => setSession('block1')}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${session === 'block1' ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
                         >
-                            MAÑANA
+                            BLOQUE 1
                         </button>
                         <button
-                            onClick={() => setSession('afternoon')}
-                            className={`px-4 py-1 rounded text-sm font-bold transition-colors ${session === 'afternoon' ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
+                            onClick={() => setSession('block2')}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${session === 'block2' ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
                         >
-                            TARDE
+                            BLOQUE 2
+                        </button>
+                        <button
+                            onClick={() => setSession('block3')}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${session === 'block3' ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
+                        >
+                            BLOQUE 3
+                        </button>
+                        <button
+                            onClick={() => setSession('block4')}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${session === 'block4' ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
+                        >
+                            BLOQUE 4
                         </button>
                     </div>
 
                     <div className="text-right hidden md:block">
                         <p className="text-gray-400 text-xs uppercase">Asignados</p>
                         <p className="text-white font-bold text-xl">{assignedCount} <span className="text-sm font-normal text-gray-500">/ {requestedCount}</span></p>
+                        {selectedSeats.length > 0 && (
+                            <p className="text-[var(--primary)] text-xs font-bold">+{selectedSeats.length} seleccionadas</p>
+                        )}
                     </div>
 
                     <button
@@ -290,6 +431,78 @@ export default function AssignSeatsPage({ params }: { params: Promise<{ registra
                     </button>
                 </div>
             </header>
+
+            {/* Bulk Assignment Toolbar */}
+            <div className="bg-neutral-900/50 border-b border-white/10 p-3 shrink-0">
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Auto-Fill Button */}
+                    <button
+                        onClick={handleAutoFill}
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all text-sm"
+                    >
+                        <Check size={16} /> Auto-Asignar Restantes
+                    </button>
+
+                    {/* Quick Select Input */}
+                    <div className="flex items-center gap-2 bg-black/40 rounded-lg px-3 py-1.5 border border-white/10">
+                        <input
+                            type="number"
+                            value={quickSelectCount}
+                            onChange={(e) => setQuickSelectCount(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleQuickSelect()}
+                            placeholder="Cantidad"
+                            className="bg-transparent text-white w-20 text-sm outline-none"
+                        />
+                        <button
+                            onClick={handleQuickSelect}
+                            disabled={!quickSelectCount}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-3 py-1 rounded text-xs transition-all"
+                        >
+                            Seleccionar
+                        </button>
+                    </div>
+
+                    {/* Zone Selection Buttons */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-xs font-bold">Por zona:</span>
+                        <button
+                            onClick={() => handleSelectZone('Preferente')}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1 rounded text-xs transition-all"
+                        >
+                            Preferente
+                        </button>
+                        <button
+                            onClick={() => handleSelectZone('Zona 2')}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded text-xs transition-all"
+                        >
+                            Zona 2
+                        </button>
+                        <button
+                            onClick={() => handleSelectZone('Zona 3')}
+                            className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded text-xs transition-all"
+                        >
+                            Zona 3
+                        </button>
+                    </div>
+
+                    {/* Deselect All */}
+                    {selectedSeats.length > 0 && (
+                        <button
+                            onClick={handleDeselectAll}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all text-sm ml-auto"
+                        >
+                            <X size={16} /> Deseleccionar Todo
+                        </button>
+                    )}
+                </div>
+
+                {/* Keyboard Shortcuts Hint */}
+                <div className="mt-2 text-xs text-gray-500 flex items-center gap-4">
+                    <span><kbd className="bg-black/40 px-1.5 py-0.5 rounded border border-white/10">A</kbd> Auto-asignar</span>
+                    <span><kbd className="bg-black/40 px-1.5 py-0.5 rounded border border-white/10">D</kbd> Deseleccionar</span>
+                    <span><kbd className="bg-black/40 px-1.5 py-0.5 rounded border border-white/10">S</kbd> Guardar</span>
+                </div>
+            </div>
 
             {/* Main Map Area */}
             <div className="flex-1 overflow-hidden relative">

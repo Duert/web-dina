@@ -15,8 +15,8 @@ export default function LoginPage() {
 
     useEffect(() => {
         const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
                 router.replace("/dashboard");
             }
         };

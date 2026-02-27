@@ -1,6 +1,6 @@
 "use strict";
 
-import { X, Calendar, Clock, MapPin, Ticket } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface EventInfoModalProps {
@@ -9,13 +9,16 @@ interface EventInfoModalProps {
 }
 
 export function EventInfoModal({ isOpen, onClose }: EventInfoModalProps) {
-    const [show, setShow] = useState(false);
+    const [show, setShow] = useState(isOpen);
 
     useEffect(() => {
         if (isOpen) {
-            setShow(true);
+            // Delay to avoid synchronous setState warning
+            const timer = setTimeout(() => setShow(true), 0);
+            return () => clearTimeout(timer);
         } else {
-            setTimeout(() => setShow(false), 300);
+            const timer = setTimeout(() => setShow(false), 300);
+            return () => clearTimeout(timer);
         }
     }, [isOpen]);
 
@@ -37,41 +40,76 @@ export function EventInfoModal({ isOpen, onClose }: EventInfoModalProps) {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <h2 className="text-2xl font-black text-white mb-1">PROGRAMA</h2>
-                    <p className="text-[var(--primary)] font-bold tracking-widest text-sm">FECHA POR CONFIRMAR</p>
+                    <p className="text-[var(--primary)] font-bold tracking-widest text-sm">29 DE MARZO DE 2026</p>
+                    <p className="text-gray-500 text-xs mt-2 italic">(Horario aproximado)</p>
                 </div>
 
                 {/* Content */}
                 <div className="space-y-6">
 
                     {/* Schedule */}
-                    <div className="bg-black/40 rounded-xl p-4 border border-white/5 space-y-4">
-                        <div className="flex items-start gap-4">
-                            <div className="bg-white/10 p-2 rounded-lg shrink-0">
-                                <Clock className="w-5 h-5 text-pink-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-bold text-sm mb-1">MAÑANA: Categorías Infantiles</h3>
-                                <div className="space-y-1 text-xs text-gray-400">
-                                    <p>• <span className="text-white">09:30</span> - Apertura de Puertas</p>
-                                    <p>• <span className="text-white">10:30</span> - Inicio Competición Infantil</p>
-                                    <p>• <span className="text-white">13:30</span> - Entrega de Premios</p>
+                    {/* Schedule */}
+                    <div className="bg-black/40 rounded-xl p-4 border border-white/5 space-y-6 overflow-y-auto max-h-[60vh]">
+                        {/* MAÑANA */}
+                        <div className="space-y-4">
+                            <h3 className="text-pink-400 font-black text-sm tracking-wider uppercase border-b border-pink-500/20 pb-2">Mañana</h3>
+
+                            {/* Bloque 1 - 09:30h */}
+                            <div className="pl-2 border-l-2 border-white/10 ml-1">
+                                <div className="flex justify-between items-baseline">
+                                    <h4 className="text-white font-bold text-sm">Bloque 1</h4>
+                                    <span className="text-xs text-pink-300 font-mono">09:30h - 11:00h</span>
                                 </div>
+                                <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
+                                    <li>• Infantil</li>
+                                    <li>• Mini-Parejas Infantil</li>
+                                    <li>• Mini-Solistas Infantil</li>
+                                </ul>
+                            </div>
+
+                            {/* Bloque 2 - 11:30h */}
+                            <div className="pl-2 border-l-2 border-white/10 ml-1">
+                                <div className="flex justify-between items-baseline">
+                                    <h4 className="text-white font-bold text-sm">Bloque 2</h4>
+                                    <span className="text-xs text-pink-300 font-mono">11:30h - 13:00h</span>
+                                </div>
+                                <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
+                                    <li>• Junior</li>
+                                    <li>• Mini-Parejas Junior</li>
+                                    <li>• Mini-Solistas Junior</li>
+                                </ul>
                             </div>
                         </div>
 
-                        <div className="h-px bg-white/5"></div>
+                        {/* TARDE */}
+                        <div className="space-y-4">
+                            <h3 className="text-indigo-400 font-black text-sm tracking-wider uppercase border-b border-indigo-500/20 pb-2">Tarde</h3>
 
-                        <div className="flex items-start gap-4">
-                            <div className="bg-white/10 p-2 rounded-lg shrink-0">
-                                <Clock className="w-5 h-5 text-indigo-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-bold text-sm mb-1">TARDE: Juvenil y Absoluta</h3>
-                                <div className="space-y-1 text-xs text-gray-400">
-                                    <p>• <span className="text-white">16:00</span> - Apertura de Puertas</p>
-                                    <p>• <span className="text-white">17:00</span> - Inicio Competición</p>
-                                    <p>• <span className="text-white">20:30</span> - Entrega de Premios</p>
+                            {/* Bloque 1 - 15:00h */}
+                            <div className="pl-2 border-l-2 border-white/10 ml-1">
+                                <div className="flex justify-between items-baseline">
+                                    <h4 className="text-white font-bold text-sm">Bloque 3</h4>
+                                    <span className="text-xs text-indigo-300 font-mono">15:00h - 16:30h</span>
                                 </div>
+                                <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
+                                    <li>• Juvenil</li>
+                                    <li>• Parejas Juvenil</li>
+                                    <li>• Solistas Juvenil</li>
+                                </ul>
+                            </div>
+
+                            {/* Bloque 2 - 17:00h */}
+                            <div className="pl-2 border-l-2 border-white/10 ml-1">
+                                <div className="flex justify-between items-baseline">
+                                    <h4 className="text-white font-bold text-sm">Bloque 4</h4>
+                                    <span className="text-xs text-indigo-300 font-mono">17:00h - 18:30h</span>
+                                </div>
+                                <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
+                                    <li>• Absoluta</li>
+                                    <li>• Parejas Absoluta</li>
+                                    <li>• Solistas Absoluta</li>
+                                    <li>• Premium</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -80,6 +118,6 @@ export function EventInfoModal({ isOpen, onClose }: EventInfoModalProps) {
 
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

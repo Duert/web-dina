@@ -20,25 +20,49 @@ import {
     Settings,
     ShieldCheck,
     Trash2,
-    AlertTriangle
+    AlertTriangle,
+    Music,
+    Ticket,
+    MessageSquare
 } from "lucide-react";
 import { Registration, Profile } from "@/types";
-import { updateProfile, deleteRegistrationAction, deleteUserAccount } from "@/app/actions";
-import { useFormState } from "react-dom"; // Use experimental hook if available or implement wrapper. 
-// Standard in Next 14 is useFormState from react-dom
-import { useRef } from "react";
+import { updateProfile, deleteRegistrationAction, deleteUserAccount, updateRegistrationMusic, getAppSettingsAction } from "@/app/actions";
+import { useActionState, useRef } from "react";
+// Standard in Next 15/React 19 is useActionState from react
+
+interface RegistrationWithDetails extends Registration {
+    registration_responsibles: { count: number }[];
+    registration_participants: { count: number }[];
+    tickets?: { count: number }[];
+}
 
 export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
-    const [registrations, setRegistrations] = useState<Registration[]>([]);
+    const [registrations, setRegistrations] = useState<RegistrationWithDetails[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isUploadingMusic, setIsUploadingMusic] = useState<string | null>(null);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false); // Make sure this exists
+    const [groupRegistrationEnabled, setGroupRegistrationEnabled] = useState(false);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const res = await getAppSettingsAction();
+                if (res.success && res.data) {
+                    setGroupRegistrationEnabled(res.data.group_registration_enabled);
+                }
+            } catch (err) {
+                console.error("Error fetching settings:", err);
+            }
+        };
+        fetchSettings();
+    }, []);
     const router = useRouter();
 
     // Server Action State for Edit Profile
-    const [editState, formAction] = useFormState(updateProfile, { success: false, message: '' });
+    const [editState, formAction, isPending] = useActionState(updateProfile, { success: false, message: '' });
 
     useEffect(() => {
         if (editState?.success) {
@@ -61,12 +85,18 @@ export default function DashboardPage() {
             .from('profiles')
             .select('*')
             .eq('id', uid)
-            .single();
+            .maybeSingle();
+
+        if (profileData) {
+            setProfile(profileData);
+        }
 
 
 
         setProfile(profileData);
     };
+
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
     useEffect(() => {
         const checkUser = async () => {
@@ -81,21 +111,76 @@ export default function DashboardPage() {
             loadProfile(user.id);
 
             fetchRegistrations(user.id);
+
+            // Polling for notifications
+            const interval = setInterval(() => fetchRegistrations(user.id, true), 15000);
+            return () => clearInterval(interval);
         };
 
         checkUser();
     }, [router]);
 
-    const fetchRegistrations = async (userId: string) => {
-        const { data, error } = await supabase
-            .from('registrations')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
+    const fetchRegistrations = async (userId: string, silent = false) => {
+        if (!silent) setLoading(true); // Don't show full loader on poll
 
-        if (error) console.error(error);
-        else setRegistrations(data || []);
-        setLoading(false);
+        try {
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('*, tickets(count)')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error(error);
+            } else {
+                setRegistrations(data || []);
+                // Fetch Unread Stats
+                if (data && data.length > 0) {
+                    // @ts-ignore
+                    const ids = data.map(r => r.id);
+                    // Dynamically import or used imported action
+                    const { getUserUnreadStats } = await import("@/app/actions-chat");
+                    const stats = await getUserUnreadStats(ids);
+                    if (stats.success && stats.data) {
+                        setUnreadCounts(stats.data);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching registrations:", err);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    };
+
+    const handleMusicReupload = async (regId: string, file: File) => {
+        setIsUploadingMusic(regId);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `music/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('uploads')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
+            const res = await updateRegistrationMusic(regId, data.publicUrl);
+
+            if (res.success) {
+                // Refresh data
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) fetchRegistrations(user.id);
+            } else {
+                alert("Error al actualizar la música: " + res.message);
+            }
+        } catch (error: any) {
+            alert("Error: " + error.message);
+        } finally {
+            setIsUploadingMusic(null);
+        }
     };
 
     const handleSignOut = async () => {
@@ -168,22 +253,33 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/5">
                                 <Building2 size={16} />
-                                <span className="text-sm font-medium">Centro Registrado</span>
+                                <span className="text-sm font-medium">Escuela Registrada</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
+
+
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                     <div>
                         <h2 className="text-2xl font-black tracking-tight uppercase">Inscripciones <span className="text-gray-600">({registrations.length})</span></h2>
                     </div>
-                    <Link
-                        href="/registration"
-                        className="bg-[var(--primary)] text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-pink-600 transition-all shadow-xl shadow-pink-500/20 active:scale-95 whitespace-nowrap"
-                    >
-                        <Plus size={20} /> Nueva Inscripción
-                    </Link>
+                    {groupRegistrationEnabled ? (
+                        <Link
+                            href="/registration"
+                            className="bg-[var(--primary)] text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-pink-600 transition-all shadow-xl shadow-pink-500/20 active:scale-95 whitespace-nowrap"
+                        >
+                            <Plus size={20} /> Nueva Inscripción
+                        </Link>
+                    ) : (
+                        <button
+                            disabled
+                            className="bg-gray-700 text-gray-400 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 cursor-not-allowed opacity-50"
+                        >
+                            <Plus size={20} /> Próximamente
+                        </button>
+                    )}
                 </div>
 
                 {registrations.length === 0 ? (
@@ -193,12 +289,21 @@ export default function DashboardPage() {
                         </div>
                         <h3 className="text-2xl font-bold text-gray-300 mb-2 tracking-tight">Todavía no habéis inscrito ningún grupo</h3>
                         <p className="text-gray-500 max-w-sm mx-auto mb-10 leading-relaxed font-medium">Podéis empezar ahora mismo y guardar el borrador si os falta algún dato.</p>
-                        <Link
-                            href="/registration"
-                            className="inline-flex items-center gap-2 bg-white text-black px-8 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-                        >
-                            Comenzar Inscripción
-                        </Link>
+                        {groupRegistrationEnabled ? (
+                            <Link
+                                href="/registration"
+                                className="inline-flex items-center gap-2 bg-white text-black px-8 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                            >
+                                Comenzar Inscripción
+                            </Link>
+                        ) : (
+                            <button
+                                disabled
+                                className="inline-flex items-center gap-2 bg-gray-700 text-gray-400 px-8 py-4 rounded-2xl font-bold cursor-not-allowed opacity-50"
+                            >
+                                Próximamente (8 de Febrero)
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
@@ -209,19 +314,93 @@ export default function DashboardPage() {
                                 onClick={() => router.push(`/registration?id=${reg.id}`)}
                             >
                                 <div className="flex items-start gap-4 flex-1">
-                                    <div className={`mt-1 p-3 rounded-2xl border ${reg.status === 'submitted' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-orange-500/10 border-orange-500/20 text-orange-500'}`}>
+                                    <div className={`mt-1 p-3 rounded-2xl border ${reg.status === 'submitted' ? 'bg-green-500/10 border-green-500/20 text-green-500' : reg.status === 'submitted_modifiable' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500'}`}>
                                         {reg.status === 'submitted' ? <CheckCircle2 size={24} /> : <Clock size={24} />}
                                     </div>
                                     <div>
-                                        <h3 className="text-2xl font-black text-white group-hover:text-[var(--primary)] transition-colors leading-tight uppercase tracking-tight">{reg.group_name}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-2xl font-black text-white group-hover:text-[var(--primary)] transition-colors leading-tight uppercase tracking-tight">{reg.group_name}</h3>
+                                            {reg.id && unreadCounts[reg.id] && unreadCounts[reg.id] > 0 && (
+                                                <div className="animate-bounce bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)] flex items-center gap-1">
+                                                    <MessageSquare size={10} className="fill-white" />
+                                                    {unreadCounts[reg.id]}
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2">
                                             <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
                                                 <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Categoría</span>
-                                                <span className="text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded-lg">{reg.category}</span>
+                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${reg.original_category && reg.original_category !== reg.category ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 animate-pulse' : 'text-white bg-white/10'}`}>
+                                                    {reg.category}
+                                                </span>
+                                                {reg.original_category && reg.original_category !== reg.category && (
+                                                    <span className="text-[10px] text-gray-600 line-through">({reg.original_category})</span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
                                                 <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Actualizado</span>
-                                                <span className="text-xs font-bold text-gray-400">{new Date(reg.created_at!).toLocaleDateString()}</span>
+                                                <span className="text-xs font-bold text-gray-400">{new Date(reg.updated_at || reg.created_at!).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Status Tracker */}
+                                        <div className="flex flex-wrap gap-2 mt-4">
+                                            {/* 1. Inscripción */}
+                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all ${reg.is_confirmed ? 'bg-green-500/10 border-green-500/20 text-green-500 shadow-[0_0_10px_rgba(34,197,94,0.1)]' : 'bg-white/5 border-white/10 text-gray-500'}`}>
+                                                {reg.is_confirmed ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                                                Inscripción: {reg.is_confirmed ? 'Confirmada' : 'Pendiente'}
+                                            </div>
+
+                                            {/* 2. Pago */}
+                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all ${reg.payment_verified ? 'bg-blue-500/10 border-blue-500/20 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.1)]' : 'bg-white/5 border-white/10 text-gray-500'}`}>
+                                                {reg.payment_verified ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                                                Pago: {reg.payment_verified ? 'Validado' : 'Por Validar'}
+                                            </div>
+
+                                            {/* 3. Música */}
+                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all 
+                                                ${reg.music_status === 'verified' ? 'bg-green-500/10 border-green-500/20 text-green-500 shadow-[0_0_10px_rgba(34,197,94,0.1)]' :
+                                                    reg.music_status === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.1)]' :
+                                                        reg.music_file_url ? 'bg-pink-500/10 border-pink-500/20 text-pink-500 shadow-[0_0_10px_rgba(255,0,204,0.1)]' :
+                                                            'bg-white/5 border-white/10 text-gray-500'}`}>
+                                                {reg.music_status === 'verified' ? <CheckCircle2 size={12} /> :
+                                                    reg.music_status === 'error' ? <AlertTriangle size={12} /> :
+                                                        reg.music_file_url ? <Music size={12} /> : <AlertTriangle size={12} />}
+
+                                                Música: {
+                                                    reg.music_status === 'verified' ? 'Audio Verificado' :
+                                                        reg.music_status === 'error' ? 'Error en archivo' :
+                                                            reg.music_status === 'received' ? 'Recibida' :
+                                                                reg.music_file_url ? 'Enviada' : 'Falta archivo'
+                                                }
+                                            </div>
+
+                                            {/* Music Re-upload Button */}
+                                            {reg.music_status === 'error' && (
+                                                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                                                    <label className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer bg-red-600 text-white border-red-500 hover:bg-red-700 shadow-[0_0_15px_rgba(220,38,38,0.4)] ${isUploadingMusic === reg.id ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                                        {isUploadingMusic === reg.id ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                                                        {isUploadingMusic === reg.id ? 'Subiendo...' : 'Actualizar Música'}
+                                                        <input
+                                                            type="file"
+                                                            accept="audio/mpeg,audio/mp3"
+                                                            className="hidden"
+                                                            disabled={isUploadingMusic === reg.id}
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) handleMusicReupload(reg.id!, file);
+                                                            }}
+                                                        />
+                                                    </label>
+                                                </div>
+                                            )}
+
+                                            {/* 4. Entradas */}
+                                            <div className="flex items-center gap-2 mt-4 text-xs font-medium text-white/50 pt-3 border-t border-white/5">
+                                                <Ticket size={12} />
+                                                <span className={`${(reg.tickets?.[0]?.count ?? 0) > 0 ? "text-[var(--primary)] font-bold" : "text-gray-500"}`}>
+                                                    Entradas: {reg.status === 'submitted' ? ((reg.tickets?.[0]?.count ?? 0) > 0 ? 'Asignadas' : 'Pdte. Asignar') : '--'}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -229,11 +408,11 @@ export default function DashboardPage() {
 
                                 <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
                                     <div className="text-left md:text-right">
-                                        <div className={`text-[11px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full inline-block mb-1 shadow-sm ${reg.status === 'submitted' ? 'bg-green-500 text-white' : 'bg-orange-500 text-black'}`}>
-                                            {reg.status === 'submitted' ? 'ENVIADO' : 'BORRADOR'}
+                                        <div className={`text-[11px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full inline-block mb-1 shadow-sm ${reg.status === 'submitted' ? 'bg-green-500 text-white' : reg.status === 'submitted_modifiable' ? 'bg-orange-500 text-white animate-pulse' : 'bg-yellow-500 text-black'}`}>
+                                            {reg.status === 'submitted' ? 'ENVIADO' : reg.status === 'submitted_modifiable' ? 'REQUIERE REVISIÓN' : 'BORRADOR'}
                                         </div>
                                         <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mt-1 opacity-60">
-                                            Click para {reg.status === 'submitted' ? 'ver' : 'continuar'}
+                                            Click para {reg.status === 'submitted' ? 'ver' : 'editar'}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">

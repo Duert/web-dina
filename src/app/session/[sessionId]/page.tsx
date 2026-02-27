@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase-server";
 import { initialSeats } from "@/lib/data";
 import SessionBooking from "@/components/session-booking";
 import { notFound } from "next/navigation";
@@ -12,10 +12,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
     const { sessionId } = await params;
 
     // Create a fresh client for this request to avoid caching issues
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = await createClient();
 
     // 1. Fetch Session Info
     const { data: sessionData, error: sessionError } = await supabase
@@ -31,19 +28,19 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
         .eq('id', 1)
         .single();
 
-    if (!settings?.public_sales_enabled) {
+    if (true) { // Always redirect or show info
         return (
             <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-8 text-center">
                 <div className="w-20 h-20 bg-neutral-800 rounded-full flex items-center justify-center mb-6">
                     <Clock size={40} className="text-gray-400" />
                 </div>
-                <h1 className="text-3xl font-bold mb-4">Venta Cerrada</h1>
+                <h1 className="text-3xl font-bold mb-4">Venta Online Deshabilitada</h1>
                 <p className="text-xl text-gray-400 max-w-lg mb-8">
-                    La venta de entradas al público general aún no está disponible.
-                    <br />Por favor, inténtalo más adelante.
+                    Las entradas restantes se venderán exclusivamente en taquilla el día del evento.
+                    <br />Puedes consultar la disponibilidad aquí.
                 </p>
                 <Link href="/" className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition-colors">
-                    Volver al Inicio
+                    Ver Disponibilidad en Inicio
                 </Link>
             </div>
         );

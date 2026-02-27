@@ -2,23 +2,27 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Calendar, MapPin, Ticket, FileText, Camera, Instagram } from "lucide-react";
+import { Calendar, MapPin, Ticket, FileText, Camera, Instagram, Trophy } from "lucide-react";
 import { useState, useEffect } from "react";
 import { LocationModal } from "@/components/ui/location-modal";
 import { EventInfoModal } from "@/components/ui/event-info-modal";
 import { supabase } from "@/lib/supabase";
 import JudgesSection from "@/components/judges-section";
 import FAQSection from "@/components/faq-section";
+import AvailabilitySection from "@/components/availability-section";
+
 
 export default function Home() {
+
+  {/* Sessions Actions */ }
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
-  const [salesOpen, setSalesOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
+  const [rankingsVisible, setRankingsVisible] = useState(false);
 
   useEffect(() => {
     // Countdown Logic
-    const targetDate = new Date('2026-03-01T09:00:00');
+    const targetDate = new Date('2026-03-29T09:00:00');
 
     const updateCountdown = () => {
       const now = new Date();
@@ -35,25 +39,24 @@ export default function Home() {
       setTimeLeft(`${days}d ${hours}h`);
     };
 
-    // AV: Countdown disabled as date is not confirmed
-    // updateCountdown();
-    // const interval = setInterval(updateCountdown, 1000 * 60); 
-    // return () => clearInterval(interval);
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000 * 60);
+    return () => clearInterval(interval);
   }, []);
 
-  // Fetch 'app_settings' locally to decide if sales are open
+  // Fetch 'app_settings' locally to decide if rankings/sales are open
   useEffect(() => {
     const fetchSettings = async () => {
       // Use supabase client
-      // We assume public_sales_enabled is in table 'app_settings', row id=1
+      // We assume settings are in table 'app_settings', row id=1
       const { data } = await supabase
         .from('app_settings')
-        .select('public_sales_enabled')
+        .select('public_rankings_visible')
         .eq('id', 1)
         .single();
 
       if (data) {
-        setSalesOpen(data.public_sales_enabled);
+        setRankingsVisible(data.public_rankings_visible);
       }
     };
     fetchSettings();
@@ -92,7 +95,7 @@ export default function Home() {
             Campeonato Coreográfico de la Vall d'Uixó
           </p>
           <p className="text-lg md:text-xl text-[var(--primary)] mt-2 font-bold tracking-widest uppercase drop-shadow-[0_0_10px_rgba(255,0,204,0.5)]">
-            Fecha por confirmar
+            29 de marzo
           </p>
         </div>
 
@@ -115,7 +118,7 @@ export default function Home() {
                 </div>
 
                 <div className="relative h-6 w-full flex items-center justify-center">
-                  <p className="text-white font-black text-lg leading-none absolute whitespace-nowrap">POR CONFIRMAR</p>
+                  <p className="text-white font-black text-lg leading-none absolute whitespace-nowrap">29 MARZO</p>
                   {/* <p className="text-white font-black text-xl leading-none opacity-0 group-hover:opacity-100 transition-opacity absolute font-mono">{timeLeft}</p> */}
                 </div>
               </div>
@@ -139,7 +142,7 @@ export default function Home() {
           {/* Center Column with Registration and Location */}
           <div className="flex flex-col gap-4 h-full">
             <Link
-              href="/registration"
+              href="/dashboard"
               className="w-full flex-1 bg-[var(--primary)] border-2 border-[var(--primary)] p-4 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-pink-600 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.5)]"
             >
               <div className="w-16 h-16 relative mb-2 group-hover:scale-110 transition-transform">
@@ -151,8 +154,8 @@ export default function Home() {
                 />
               </div>
               <div className="text-center">
-                <h3 className="font-black text-white text-2xl leading-none mb-1">INSCRIPCIONES</h3>
-                <p className="text-pink-100 text-sm font-medium">Registra tu grupo ahora</p>
+                <h3 className="font-black text-white text-2xl leading-none mb-1">ACCESO ESCUELAS</h3>
+                <p className="text-pink-100 text-sm font-medium">Crea tu usuario y perfil</p>
               </div>
             </Link>
 
@@ -162,16 +165,32 @@ export default function Home() {
             >
               <MapPin className="w-8 h-8 text-[var(--primary)] mb-3 group-hover:scale-110 transition-transform" />
               <h3 className="font-bold text-white mb-1">LUGAR</h3>
-              <p className="text-gray-400 text-sm leading-tight">Auditorio Leopoldo Peñaroja<br /><span className="text-xs opacity-70">La Vall d'Uixó</span></p>
+              <p className="text-gray-400 text-sm leading-tight">Teatro Municipal Carmen Tur<br /><span className="text-xs opacity-70">La Vall d'Uixó</span></p>
             </button>
+
+            {/* ENTRADAS Button Removed - Availability now shown in main section */}
           </div>
 
           {/* Downloads Column */}
           <div className="flex flex-col gap-4">
+
+            {rankingsVisible && (
+              <Link
+                href="/rankings"
+                className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 border border-yellow-400/30 p-4 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(255,200,0,0.2)] mb-2 animate-in slide-in-from-right-4 fade-in duration-500"
+              >
+                <Trophy className="w-8 h-8 text-white group-hover:rotate-12 transition-transform" />
+                <div className="text-left">
+                  <h3 className="font-black text-white text-xl leading-none">CLASIFICACIONES</h3>
+                  <p className="text-yellow-100 text-xs font-bold">Resultados en vivo</p>
+                </div>
+              </Link>
+            )}
+
             <h3 className="text-white font-bold text-sm tracking-wider opacity-70 mb-1">DESCARGAS</h3>
 
             <a
-              href="/docs/bases.pdf"
+              href="/docs/bases_2026.pdf?v=2"
               target="_blank"
               download
               className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
@@ -180,8 +199,8 @@ export default function Home() {
                 <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
               </div>
               <div className="text-left">
-                <h3 className="font-bold text-white text-sm">BASES</h3>
-                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Oficiales 2026</p>
+                <h3 className="font-bold text-white text-sm">BASES 2026</h3>
+                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Descargar reglamento</p>
               </div>
             </a>
 
@@ -263,48 +282,12 @@ export default function Home() {
           <FAQSection />
         </div>
 
-        {/* Sessions Actions */}
-        <div className="w-full flex flex-col items-center gap-8">
-          <h2 className="text-2xl md:text-4xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] text-center uppercase">
-            COMPRA TUS ENTRADAS AQUÍ
-          </h2>
-          <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-center">
-            {/* 
-              Controlled by 'app_settings' table in Supabase.
-              Toggle via Admin Panel > Configuración header button.
-            */}
-            {salesOpen ? (
-              <>
-                <Link
-                  href="/session/morning"
-                  className="group relative px-8 py-4 bg-black/50 border-2 border-[var(--primary)] text-[var(--primary)] font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-[var(--primary)] hover:text-white hover:scale-105 w-full md:w-64 backdrop-blur-sm"
-                >
-                  <div className="flex flex-col items-center">
-                    <span>SESIÓN MAÑANA</span>
-                    <span className="text-xs font-normal opacity-90 mt-1">10:00h</span>
-                  </div>
-                </Link>
-
-                <Link
-                  href="/session/afternoon"
-                  className="group relative px-8 py-4 bg-[var(--primary)] text-white font-bold text-lg rounded-full overflow-hidden transition-all hover:bg-pink-600 hover:scale-105 shadow-[0_0_20px_rgba(255,0,204,0.3)] hover:shadow-[0_0_40px_rgba(255,0,204,0.6)] w-full md:w-64"
-                >
-                  <div className="flex flex-col items-center">
-                    <span>SESIÓN TARDE</span>
-                    <span className="text-xs font-normal opacity-90 mt-1">15:30h</span>
-                  </div>
-                </Link>
-              </>
-            ) : (
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 p-8 rounded-2xl max-w-2xl text-center">
-                <p className="text-xl md:text-2xl text-pink-200 font-medium leading-relaxed">
-                  Cuando abramos la taquilla virtual...
-                  <span className="block text-white font-bold mt-2">Podrás comprar aquí tus entradas</span>
-                </p>
-              </div>
-            )}
-          </div>
+        {/* AVAILABILITY SECTION */}
+        <div className="w-full mb-24">
+          <AvailabilitySection />
         </div>
+
+        {/* Purchase Section Removed as per user request (Box Office Only) */}
 
 
 

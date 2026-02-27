@@ -1,10 +1,17 @@
-
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from "@/lib/supabase-server";
 import { initialSeats } from '@/lib/data';
 
-export async function GET() {
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const secret = searchParams.get('secret');
+
+    if (secret !== process.env.SEED_SECRET) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
+        const supabase = await createClient();
         // 1. Sessions
         const { error: sessionsError } = await supabase
             .from('sessions')
