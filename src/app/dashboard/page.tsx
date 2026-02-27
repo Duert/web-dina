@@ -136,7 +136,6 @@ export default function DashboardPage() {
                 setRegistrations(data || []);
                 // Fetch Unread Stats
                 if (data && data.length > 0) {
-                    // @ts-ignore
                     const ids = data.map(r => r.id);
                     // Dynamically import or used imported action
                     const { getUserUnreadStats } = await import("@/app/actions-chat");

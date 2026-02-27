@@ -247,7 +247,6 @@ function RegistrationForm() {
 
     const updateParticipant = (index: number, field: keyof RegistrationParticipant, value: any) => {
         const newList = [...participants];
-        // @ts-ignore
         newList[index] = { ...newList[index], [field]: value };
         setParticipants(newList);
     };
