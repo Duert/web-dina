@@ -206,10 +206,11 @@ function RegistrationForm() {
     const handleCategoryChange = (newCategory: DanceCategory) => {
         const closedCategories = [
             "Infantil", "Infantil Mini-parejas", "Mini-Solistas Infantil",
-            "Junior", "Junior Mini-parejas", "Mini-Solistas Junior"
+            "Junior", "Junior Mini-parejas", "Mini-Solistas Junior",
+            "Absoluta", "Parejas", "Solistas Absoluta", "Premium"
         ];
         if (closedCategories.includes(newCategory) && initialCategory !== newCategory) {
-            alert("Hemos cerrado las inscripciones de las categorias del Bloque 1 y Bloque 2. Hemos llenado el cupo de grupos. Disculpar por las molestias.");
+            alert("Hemos cerrado las inscripciones de las categorias del Bloque 1, Bloque 2 y Bloque 4. Hemos llenado el cupo de grupos. Disculpar por las molestias.");
             return;
         }
         setCategory(newCategory);
@@ -503,10 +504,11 @@ function RegistrationForm() {
 
                 const closedCategories = [
                     "Infantil", "Infantil Mini-parejas", "Mini-Solistas Infantil",
-                    "Junior", "Junior Mini-parejas", "Mini-Solistas Junior"
+                    "Junior", "Junior Mini-parejas", "Mini-Solistas Junior",
+                    "Absoluta", "Parejas", "Solistas Absoluta", "Premium"
                 ];
                 if (closedCategories.includes(nextCategory as any) && initialCategory !== nextCategory) {
-                    setError(`No se puede reasignar automáticamente a la categoría superior (${nextCategory}) porque hemos cerrado las inscripciones de estas categorías. El cupo de grupos del Bloque 1 y Bloque 2 está lleno. Revisa las fechas de nacimiento.`);
+                    setError(`No se puede reasignar automáticamente a la categoría superior (${nextCategory}) porque hemos cerrado las inscripciones de estas categorías. El cupo de grupos del Bloque 1, Bloque 2 y Bloque 4 está lleno. Revisa las fechas de nacimiento.`);
                     return false;
                 }
 
