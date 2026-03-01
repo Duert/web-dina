@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 import { sendRegistrationEmail } from "@/app/actions-email";
 import { ChatSection } from "@/components/chat-section";
 import { validateCategoryRules } from "@/lib/category-validation";
+import { consumeQuotaAction } from "@/app/actions-quotas";
 
 function RegistrationForm() {
     const searchParams = useSearchParams();
@@ -580,6 +581,25 @@ function RegistrationForm() {
         }
 
         setSubmitting(true);
+
+        // 4. Global Registration Deadline Check (March 2nd, 2026 00:00 = UTC Time: 2026-03-01T23:00:00Z)
+        // We use March 2nd CET (Europe/Madrid) as the cutoff
+        const now = new Date();
+        const cutoffDate = new Date('2026-03-01T23:00:00Z'); // 00:00 in Spain is 23:00 the day before in UTC
+
+        if (now >= cutoffDate) {
+            // It is past the deadline. Check for explicitly opened quotas.
+            const quotaRes = await consumeQuotaAction(category);
+
+            if (!quotaRes.success || !quotaRes.allowed) {
+                setSubmitting(false);
+                setError("El plazo general de inscripción ha terminado. No hay plazas extraordinarias abiertas actualmente para la categoría " + category + ".");
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            // If quotaRes.allowed is true, the quota was successfully consumed, so we let the submit proceed.
+        }
+
         await saveToDB('submitted');
         setSubmitting(false);
     };

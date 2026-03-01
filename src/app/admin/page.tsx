@@ -23,6 +23,7 @@ import AdminSeatingManager from "@/components/admin-seating-manager";
 import { Registration } from "@/types";
 import { AdminSidebarNotificationBadge } from "@/components/admin/notification-badge";
 import dynamic from "next/dynamic";
+import AdminQuotasManager from "@/components/admin-quotas-manager";
 
 const PDFExportButton = dynamic(
     () => import("@/components/pdf/PDFExportButton").then((mod) => mod.PDFExportButton),
@@ -54,7 +55,7 @@ export default function AdminPage() {
     // Data State
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'schools' | 'config' | 'judges' | 'faq' | 'seating'>('registrations');
+    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'schools' | 'config' | 'judges' | 'faq' | 'seating' | 'quotas'>('registrations');
     const [groupRegistrationEnabled, setGroupRegistrationEnabled] = useState(false);
     const [publicSalesEnabled, setPublicSalesEnabled] = useState(false);
 
@@ -798,6 +799,13 @@ export default function AdminPage() {
                     </Link>
 
                     <button
+                        onClick={() => setActiveTab('quotas')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'quotas' ? 'text-amber-500' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Plazas Extra
+                        {activeTab === 'quotas' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-amber-500" />}
+                    </button>
+                    <button
                         onClick={() => setActiveTab('config')}
                         className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'config' ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-white'}`}
                     >
@@ -807,7 +815,11 @@ export default function AdminPage() {
                 </div>
 
                 {/* Content */}
-                {activeTab === 'registrations' ? (
+                {activeTab === 'quotas' ? (
+                    <div className="space-y-6">
+                        <AdminQuotasManager />
+                    </div>
+                ) : activeTab === 'registrations' ? (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-2xl font-bold flex items-center gap-2">
