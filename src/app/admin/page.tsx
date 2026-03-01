@@ -2336,8 +2336,8 @@ export default function AdminPage() {
                                                             )}
                                                         </td>
                                                         <td className="p-3 text-center">
-                                                            <span className={`text - [10px] font - black uppercase px - 2 py - 0.5 rounded - full ${reg.status === 'submitted' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'} `}>
-                                                                {reg.status === 'submitted' ? 'Enviado' : 'Borrador'}
+                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${reg.status === 'submitted' ? 'bg-green-500/20 text-green-400' : reg.status === 'submitted_modifiable' ? 'bg-orange-500/20 text-orange-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                                                {reg.status === 'submitted' ? 'Enviado' : reg.status === 'submitted_modifiable' ? 'Modificable' : 'Borrador'}
                                                             </span>
                                                         </td>
                                                         <td className="p-3 text-center text-sm text-gray-400">
