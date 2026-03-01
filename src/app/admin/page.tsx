@@ -867,7 +867,7 @@ export default function AdminPage() {
                                     {Object.keys(BLOCK_DEFINITIONS).map(block => {
                                         // Count items in this block (respecting other filters?) -> No, typically counts show total possible. 
                                         // Or maybe filtered by verification? Let's keep it simple: Raw counts in block.
-                                        const count = registrations.filter(r => BLOCK_DEFINITIONS[block].includes(r.category)).length;
+                                        const count = registrations.filter(r => BLOCK_DEFINITIONS[block].includes(r.category) && r.status !== 'draft').length;
                                         return (
                                             <button
                                                 key={block}
@@ -898,7 +898,7 @@ export default function AdminPage() {
                                             // Let's show TOTALS for the block to be most useful for planning.
 
                                             const blockCategories = BLOCK_DEFINITIONS[filterBlock] || [];
-                                            const blockRegs = registrations.filter(r => blockCategories.includes(r.category));
+                                            const blockRegs = registrations.filter(r => blockCategories.includes(r.category) && r.status !== 'draft');
 
                                             // Group by category
                                             const counts: Record<string, number> = {};
@@ -997,7 +997,7 @@ export default function AdminPage() {
                                             // Let's show TOTALS for the block to be most useful for planning.
 
                                             const blockCategories = BLOCK_DEFINITIONS[filterBlock] || [];
-                                            const blockRegs = registrations.filter(r => blockCategories.includes(r.category));
+                                            const blockRegs = registrations.filter(r => blockCategories.includes(r.category) && r.status !== 'draft');
 
                                             // Group by category
                                             const counts: Record<string, number> = {};
