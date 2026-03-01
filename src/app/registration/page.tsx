@@ -582,10 +582,10 @@ function RegistrationForm() {
 
         setSubmitting(true);
 
-        // 4. Global Registration Deadline Check (March 2nd, 2026 00:00 = UTC Time: 2026-03-01T23:00:00Z)
-        // We use March 2nd CET (Europe/Madrid) as the cutoff
+        // 4. Global Registration Deadline Check
+        // Cierre general a las 00:00 del 2 de Marzo, hora de España (CET: UTC+1)
         const now = new Date();
-        const cutoffDate = new Date('2026-03-01T23:00:00Z'); // 00:00 in Spain is 23:00 the day before in UTC
+        const cutoffDate = new Date('2026-03-02T00:00:00+01:00');
 
         if (now >= cutoffDate) {
             // It is past the deadline. Check for explicitly opened quotas.
