@@ -9,6 +9,7 @@ import { AdminSeatMapModal } from "@/components/admin-seat-map-modal";
 import { PDFDownloadButton } from "@/components/pdf-download-button";
 import { initialSeats, sessions } from "@/lib/data";
 import { Seat } from "@/types";
+import { getSchoolsStatsAction } from "@/app/actions-admin";
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,9 @@ export default async function AccountingPage() {
         const orders = ordersResult.data;
         const tickets = ticketsResult.data;
         const registrations = registrationsResult.data;
+
+        const schoolStatsResult = await getSchoolsStatsAction();
+        const schoolStats = schoolStatsResult.success ? (schoolStatsResult.data as any[]) : [];
 
 
         const PRICE_DANCER = 3.5;
@@ -538,6 +542,95 @@ export default async function AccountingPage() {
                                         <tr>
                                             <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                                                 No hay datos para mostrar
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Desglose por Escuelas (Aforo) */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-10">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                            <h2 className="font-bold text-slate-800">Desglose por Escuela (Bailarines y Responsables Únicos por Bloque)</h2>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase border-b text-[10px]">
+                                    <tr>
+                                        <th className="px-4 py-3 min-w-[150px]">Escuela</th>
+                                        <th className="px-4 py-3 text-center">B1</th>
+                                        <th className="px-4 py-3 text-center bg-slate-50/50">B2</th>
+                                        <th className="px-4 py-3 text-center">B3</th>
+                                        <th className="px-4 py-3 text-center bg-slate-50/50">B4</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {schoolStats.map((school, i) => (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="font-bold text-slate-800">{school.school_name}</div>
+                                                <div className="text-[10px] text-slate-400 uppercase">{school.rep_name} {school.rep_surnames}</div>
+                                            </td>
+                                            <td className="px-4 py-2 text-center align-top">
+                                                <div className="flex flex-col gap-1 items-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block1 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
+                                                        🎟️ {school.tickets_by_block?.block1 || 0}
+                                                    </span>
+                                                    {(school.unique_participants_by_block?.block1 || 0) > 0 && (
+                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block1}</span>
+                                                    )}
+                                                    {(school.unique_responsibles_by_block?.block1 || 0) > 0 && (
+                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block1}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-center align-top bg-slate-50/30">
+                                                <div className="flex flex-col gap-1 items-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block2 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
+                                                        🎟️ {school.tickets_by_block?.block2 || 0}
+                                                    </span>
+                                                    {(school.unique_participants_by_block?.block2 || 0) > 0 && (
+                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block2}</span>
+                                                    )}
+                                                    {(school.unique_responsibles_by_block?.block2 || 0) > 0 && (
+                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block2}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-center align-top">
+                                                <div className="flex flex-col gap-1 items-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block3 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
+                                                        🎟️ {school.tickets_by_block?.block3 || 0}
+                                                    </span>
+                                                    {(school.unique_participants_by_block?.block3 || 0) > 0 && (
+                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block3}</span>
+                                                    )}
+                                                    {(school.unique_responsibles_by_block?.block3 || 0) > 0 && (
+                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block3}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-center align-top bg-slate-50/30">
+                                                <div className="flex flex-col gap-1 items-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block4 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
+                                                        🎟️ {school.tickets_by_block?.block4 || 0}
+                                                    </span>
+                                                    {(school.unique_participants_by_block?.block4 || 0) > 0 && (
+                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block4}</span>
+                                                    )}
+                                                    {(school.unique_responsibles_by_block?.block4 || 0) > 0 && (
+                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block4}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {schoolStats.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                                                No hay datos de escuelas para mostrar.
                                             </td>
                                         </tr>
                                     )}

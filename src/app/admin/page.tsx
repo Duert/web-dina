@@ -1443,56 +1443,24 @@ export default function AdminPage() {
                                                         {school.participants_count}
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <div className="flex flex-col gap-1 items-center">
-                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block1 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`} title="Entradas Totales">
-                                                                🎟️ {school.tickets_by_block?.block1 || 0}
-                                                            </span>
-                                                            {school.unique_participants_by_block?.block1 > 0 && (
-                                                                <span className="text-[10px] text-blue-300" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block1}</span>
-                                                            )}
-                                                            {school.unique_responsibles_by_block?.block1 > 0 && (
-                                                                <span className="text-[10px] text-purple-300" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block1}</span>
-                                                            )}
-                                                        </div>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block1 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`}>
+                                                            {school.tickets_by_block?.block1 || 0}
+                                                        </span>
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <div className="flex flex-col gap-1 items-center">
-                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block2 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`} title="Entradas Totales">
-                                                                🎟️ {school.tickets_by_block?.block2 || 0}
-                                                            </span>
-                                                            {school.unique_participants_by_block?.block2 > 0 && (
-                                                                <span className="text-[10px] text-blue-300" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block2}</span>
-                                                            )}
-                                                            {school.unique_responsibles_by_block?.block2 > 0 && (
-                                                                <span className="text-[10px] text-purple-300" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block2}</span>
-                                                            )}
-                                                        </div>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block2 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`}>
+                                                            {school.tickets_by_block?.block2 || 0}
+                                                        </span>
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <div className="flex flex-col gap-1 items-center">
-                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block3 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`} title="Entradas Totales">
-                                                                🎟️ {school.tickets_by_block?.block3 || 0}
-                                                            </span>
-                                                            {school.unique_participants_by_block?.block3 > 0 && (
-                                                                <span className="text-[10px] text-blue-300" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block3}</span>
-                                                            )}
-                                                            {school.unique_responsibles_by_block?.block3 > 0 && (
-                                                                <span className="text-[10px] text-purple-300" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block3}</span>
-                                                            )}
-                                                        </div>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block3 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`}>
+                                                            {school.tickets_by_block?.block3 || 0}
+                                                        </span>
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <div className="flex flex-col gap-1 items-center">
-                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block4 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`} title="Entradas Totales">
-                                                                🎟️ {school.tickets_by_block?.block4 || 0}
-                                                            </span>
-                                                            {school.unique_participants_by_block?.block4 > 0 && (
-                                                                <span className="text-[10px] text-blue-300" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block4}</span>
-                                                            )}
-                                                            {school.unique_responsibles_by_block?.block4 > 0 && (
-                                                                <span className="text-[10px] text-purple-300" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block4}</span>
-                                                            )}
-                                                        </div>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(school.tickets_by_block?.block4 || 0) > 0 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : 'text-gray-600'}`}>
+                                                            {school.tickets_by_block?.block4 || 0}
+                                                        </span>
                                                     </td>
                                                     <td className="p-4 text-center">
                                                         <div className="bg-white/5 border border-white/10 px-2 py-1 rounded text-xs font-bold text-white">
