@@ -54,7 +54,7 @@ export default async function AccountingPage() {
             supabaseAdmin.from('orders').select('*').order('created_at', { ascending: false }),
             fetchAllTickets(),
             supabaseAdmin.from('registrations')
-                .select('*, registration_participants(*)')
+                .select('*, registration_participants(*), registration_responsibles(*)')
         ]);
 
         if (ordersResult.error) throw ordersResult.error;
@@ -109,6 +109,23 @@ export default async function AccountingPage() {
             tickets_draft: number
         }>> = {};
 
+        const uniqueDancersByBlock = { block1: new Set<string>(), block2: new Set<string>(), block3: new Set<string>(), block4: new Set<string>() };
+        const uniqueResponsiblesByBlock = { block1: new Set<string>(), block2: new Set<string>(), block3: new Set<string>(), block4: new Set<string>() };
+        const grossDancersByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
+        const grossResponsiblesByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
+
+        const getBlockKeyFromCategory = (category: string) => {
+            const b1 = ['Infantil', 'Infantil Mini-parejas', 'Mini-Solistas Infantil'];
+            const b2 = ['Junior', 'Junior Mini-parejas', 'Mini-Solistas Junior'];
+            const b3 = ['Juvenil', 'Juvenil Parejas', 'Solistas Juvenil'];
+            const b4 = ['Absoluta', 'Parejas', 'Solistas Absoluta', 'Premium'];
+            if (b1.includes(category)) return 'block1';
+            if (b2.includes(category)) return 'block2';
+            if (b3.includes(category)) return 'block3';
+            if (b4.includes(category)) return 'block4';
+            return null;
+        };
+
         registrations?.forEach(reg => {
             const block = getBlockName(reg.category);
             const cat = reg.category;
@@ -116,8 +133,11 @@ export default async function AccountingPage() {
             if (!breakdown[block]) breakdown[block] = {};
             if (!breakdown[block][cat]) breakdown[block][cat] = { dancers_confirmed: 0, dancers_draft: 0, tickets_confirmed: 0, tickets_draft: 0 };
 
-            const participants = reg.registration_participants?.length || 0;
-            const tickets = reg.registration_participants?.reduce((s: number, p: any) => s + (p.num_tickets || 0), 0) || 0;
+            const participantsArr = reg.registration_participants || [];
+            const responsiblesArr = reg.registration_responsibles || [];
+
+            const participants = participantsArr.length;
+            const tickets = participantsArr.reduce((s: number, p: any) => s + (p.num_tickets || 0), 0) || 0;
 
             const dancersVal = participants * PRICE_DANCER;
             const ticketsVal = tickets * PRICE_TICKET;
@@ -150,6 +170,22 @@ export default async function AccountingPage() {
                     // Submitted but not confirmed -> pending revenue
                     dancersRevenuePending += dancersVal;
                     ticketsRevenuePending += ticketsVal;
+                }
+
+                // Add to Global Block Aggregation (Gross & Unique sums) only if not draft
+                const blockKey = getBlockKeyFromCategory(reg.category);
+                if (blockKey) {
+                    grossDancersByBlock[blockKey as keyof typeof grossDancersByBlock] += participantsArr.length;
+                    grossResponsiblesByBlock[blockKey as keyof typeof grossResponsiblesByBlock] += responsiblesArr.length;
+
+                    participantsArr.forEach((p: any) => {
+                        const key = `${p.name?.trim().toLowerCase()}-${p.surnames?.trim().toLowerCase()}`;
+                        if (key && key !== '-') uniqueDancersByBlock[blockKey as keyof typeof uniqueDancersByBlock].add(key);
+                    });
+                    responsiblesArr.forEach((r: any) => {
+                        const key = `${r.name?.trim().toLowerCase()}-${r.surnames?.trim().toLowerCase()}`;
+                        if (key && key !== '-') uniqueResponsiblesByBlock[blockKey as keyof typeof uniqueResponsiblesByBlock].add(key);
+                    });
                 }
             }
         });
@@ -321,6 +357,46 @@ export default async function AccountingPage() {
                                 <p className="text-2xl font-black text-slate-400 mt-1">{possibleTickets}</p>
                                 <p className="text-[10px] text-slate-400 mt-1">Solicitadas en borrador</p>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* KPI Cards: Global Block Attendance (Gross vs Unique) */}
+                    <div className="mb-10">
+                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Total Bailarines y Responsables por Bloque (Con vs Sin Duplicidades)</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {['block1', 'block2', 'block3', 'block4'].map((b, idx) => {
+                                const bp = b as keyof typeof grossDancersByBlock;
+                                const bn = `Bloque ${idx + 1}`;
+                                return (
+                                    <div key={b} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                                        <h3 className="text-slate-500 font-bold uppercase mb-3 flex items-center justify-between">
+                                            <span>{bn}</span>
+                                        </h3>
+                                        <div className="space-y-3">
+                                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase">Bailarines</span>
+                                                    <span className="text-xs text-slate-400 font-medium">Inscritos Totales</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xl font-black text-slate-900 leading-none">{grossDancersByBlock[bp]}</p>
+                                                    <p className="text-[10px] text-blue-500 font-bold flex items-center gap-1 justify-end mt-1"><CheckCircle size={10} /> {uniqueDancersByBlock[bp].size} únicos</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase">Responsables</span>
+                                                    <span className="text-xs text-slate-400 font-medium">Inscritos Totales</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xl font-black text-slate-900 leading-none">{grossResponsiblesByBlock[bp]}</p>
+                                                    <p className="text-[10px] text-purple-500 font-bold flex items-center gap-1 justify-end mt-1"><CheckCircle size={10} /> {uniqueResponsiblesByBlock[bp].size} únicos</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
 
