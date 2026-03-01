@@ -2184,19 +2184,34 @@ export default function AdminPage() {
                                         let totalParticipants = 0;
                                         let totalTickets = 0;
                                         const ticketsByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
-                                        const participantsByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
+
+                                        const uniqueParticipantsByBlock = { block1: new Set<string>(), block2: new Set<string>(), block3: new Set<string>(), block4: new Set<string>() };
+                                        const uniqueResponsiblesByBlock = { block1: new Set<string>(), block2: new Set<string>(), block3: new Set<string>(), block4: new Set<string>() };
 
                                         schoolRegistrations.forEach((reg: any) => {
                                             if (!reg.status || reg.status === 'draft') return; // Exclude drafts from totals
 
                                             const participants = reg.registration_participants || [];
+                                            const responsibles = reg.registration_responsibles || [];
                                             const participantsCount = participants.length;
                                             totalParticipants += participantsCount;
 
                                             const blockId = getCategoryBlock(reg.category);
 
-                                            if (blockId && participantsByBlock.hasOwnProperty(blockId)) {
-                                                participantsByBlock[blockId as keyof typeof participantsByBlock] += participantsCount;
+                                            if (blockId && uniqueParticipantsByBlock.hasOwnProperty(blockId)) {
+                                                participants.forEach((p: any) => {
+                                                    const key = `${p.name?.trim().toLowerCase()}-${p.surnames?.trim().toLowerCase()}`;
+                                                    if (key && key !== '-') {
+                                                        uniqueParticipantsByBlock[blockId as keyof typeof uniqueParticipantsByBlock].add(key);
+                                                    }
+                                                });
+
+                                                responsibles.forEach((r: any) => {
+                                                    const key = `${r.name?.trim().toLowerCase()}-${r.surnames?.trim().toLowerCase()}`;
+                                                    if (key && key !== '-') {
+                                                        uniqueResponsiblesByBlock[blockId as keyof typeof uniqueResponsiblesByBlock].add(key);
+                                                    }
+                                                });
                                             }
 
                                             participants.forEach((p: any) => {
@@ -2282,32 +2297,36 @@ export default function AdminPage() {
                                                         </div>
                                                         <div className="text-2xl font-black text-pink-200">{totalTickets}</div>
                                                     </div>
-                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center">
-                                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bloque 1</div>
-                                                        <div className="text-sm font-bold text-white flex gap-2">
-                                                            <span title="Participantes"><Users size={12} className="inline mr-1 text-blue-300" />{participantsByBlock.block1}</span>
-                                                            <span title="Entradas"><Ticket size={12} className="inline mr-1 text-pink-300" />{ticketsByBlock.block1}</span>
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center gap-1">
+                                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Bloque 1</div>
+                                                        <div className="grid grid-cols-1 gap-y-1 text-xs font-bold text-white">
+                                                            <div className="flex items-center justify-between text-blue-300" title="Bailarines Únicos"><span className="flex items-center gap-1"><Users size={12} /> Bailarines</span> <span>{uniqueParticipantsByBlock.block1.size}</span></div>
+                                                            <div className="flex items-center justify-between text-purple-300" title="Responsables Únicos"><span className="flex items-center gap-1"><UserIcon size={12} /> Responsables</span> <span>{uniqueResponsiblesByBlock.block1.size}</span></div>
+                                                            <div className="flex items-center justify-between text-pink-300 border-t border-white/10 pt-1 mt-0.5" title="Entradas Totales"><span className="flex items-center gap-1"><Ticket size={12} /> Entradas</span> <span>{ticketsByBlock.block1}</span></div>
                                                         </div>
                                                     </div>
-                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center">
-                                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bloque 2</div>
-                                                        <div className="text-sm font-bold text-white flex gap-2">
-                                                            <span title="Participantes"><Users size={12} className="inline mr-1 text-blue-300" />{participantsByBlock.block2}</span>
-                                                            <span title="Entradas"><Ticket size={12} className="inline mr-1 text-pink-300" />{ticketsByBlock.block2}</span>
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center gap-1">
+                                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Bloque 2</div>
+                                                        <div className="grid grid-cols-1 gap-y-1 text-xs font-bold text-white">
+                                                            <div className="flex items-center justify-between text-blue-300" title="Bailarines Únicos"><span className="flex items-center gap-1"><Users size={12} /> Bailarines</span> <span>{uniqueParticipantsByBlock.block2.size}</span></div>
+                                                            <div className="flex items-center justify-between text-purple-300" title="Responsables Únicos"><span className="flex items-center gap-1"><UserIcon size={12} /> Responsables</span> <span>{uniqueResponsiblesByBlock.block2.size}</span></div>
+                                                            <div className="flex items-center justify-between text-pink-300 border-t border-white/10 pt-1 mt-0.5" title="Entradas Totales"><span className="flex items-center gap-1"><Ticket size={12} /> Entradas</span> <span>{ticketsByBlock.block2}</span></div>
                                                         </div>
                                                     </div>
-                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center">
-                                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bloque 3</div>
-                                                        <div className="text-sm font-bold text-white flex gap-2">
-                                                            <span title="Participantes"><Users size={12} className="inline mr-1 text-blue-300" />{participantsByBlock.block3}</span>
-                                                            <span title="Entradas"><Ticket size={12} className="inline mr-1 text-pink-300" />{ticketsByBlock.block3}</span>
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center gap-1">
+                                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Bloque 3</div>
+                                                        <div className="grid grid-cols-1 gap-y-1 text-xs font-bold text-white">
+                                                            <div className="flex items-center justify-between text-blue-300" title="Bailarines Únicos"><span className="flex items-center gap-1"><Users size={12} /> Bailarines</span> <span>{uniqueParticipantsByBlock.block3.size}</span></div>
+                                                            <div className="flex items-center justify-between text-purple-300" title="Responsables Únicos"><span className="flex items-center gap-1"><UserIcon size={12} /> Responsables</span> <span>{uniqueResponsiblesByBlock.block3.size}</span></div>
+                                                            <div className="flex items-center justify-between text-pink-300 border-t border-white/10 pt-1 mt-0.5" title="Entradas Totales"><span className="flex items-center gap-1"><Ticket size={12} /> Entradas</span> <span>{ticketsByBlock.block3}</span></div>
                                                         </div>
                                                     </div>
-                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center">
-                                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bloque 4</div>
-                                                        <div className="text-sm font-bold text-white flex gap-2">
-                                                            <span title="Participantes"><Users size={12} className="inline mr-1 text-blue-300" />{participantsByBlock.block4}</span>
-                                                            <span title="Entradas"><Ticket size={12} className="inline mr-1 text-pink-300" />{ticketsByBlock.block4}</span>
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2 flex flex-col justify-center gap-1">
+                                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Bloque 4</div>
+                                                        <div className="grid grid-cols-1 gap-y-1 text-xs font-bold text-white">
+                                                            <div className="flex items-center justify-between text-blue-300" title="Bailarines Únicos"><span className="flex items-center gap-1"><Users size={12} /> Bailarines</span> <span>{uniqueParticipantsByBlock.block4.size}</span></div>
+                                                            <div className="flex items-center justify-between text-purple-300" title="Responsables Únicos"><span className="flex items-center gap-1"><UserIcon size={12} /> Responsables</span> <span>{uniqueResponsiblesByBlock.block4.size}</span></div>
+                                                            <div className="flex items-center justify-between text-pink-300 border-t border-white/10 pt-1 mt-0.5" title="Entradas Totales"><span className="flex items-center gap-1"><Ticket size={12} /> Entradas</span> <span>{ticketsByBlock.block4}</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
