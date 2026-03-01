@@ -535,14 +535,21 @@ export async function getSchoolsStatsAction() {
 
         if (profError) throw profError;
 
-        // 2. Fetch all registrations
+        // 2. Fetch all registrations with their inner data to calculate unique participants and responsibles
         const { data: registrations, error: regError } = await supabaseAdmin
             .from('registrations')
-            .select('id, user_id');
+            .select(`
+                id, 
+                user_id,
+                category,
+                status,
+                registration_participants(name, surnames),
+                registration_responsibles(name, surnames)
+            `);
 
         if (regError) throw regError;
 
-        // 3. Fetch all participants
+        // 3. Fetch all participants for total counts (can be optimized but keeping existing logic)
         const { data: participants, error: partError } = await supabaseAdmin
             .from('registration_participants')
             .select('registration_id');
@@ -576,9 +583,58 @@ export async function getSchoolsStatsAction() {
         const tickets = allTickets;
 
         // Process data
+        const getCategoryBlock = (category: string) => {
+            const block1 = ['Infantil', 'Infantil Mini-parejas', 'Mini-Solistas Infantil'];
+            const block2 = ['Junior', 'Junior Mini-parejas', 'Mini-Solistas Junior'];
+            const block3 = ['Juvenil', 'Juvenil Parejas', 'Solistas Juvenil'];
+            const block4 = ['Absoluta', 'Parejas', 'Solistas Absoluta', 'Premium'];
+
+            if (block1.includes(category)) return 'block1';
+            if (block2.includes(category)) return 'block2';
+            if (block3.includes(category)) return 'block3';
+            if (block4.includes(category)) return 'block4';
+            return null;
+        };
+
         const stats = profiles.map(profile => {
+            // Include all logic for group counts
             const schoolRegs = registrations.filter(r => r.user_id === profile.id);
             const regIds = schoolRegs.map(r => r.id);
+
+            // Calculate unique participants and responsibles per block, excluding drafts
+            const validRegs = schoolRegs.filter(r => r.status && r.status !== 'draft');
+
+            const uniqueParticipantsByBlock = { block1: new Set<string>(), block2: new Set<string>(), block3: new Set<string>(), block4: new Set<string>() };
+            const uniqueResponsiblesByBlock = { block1: new Set<string>(), block2: new Set<string>(), block3: new Set<string>(), block4: new Set<string>() };
+
+            validRegs.forEach((reg) => {
+                const blockId = getCategoryBlock(reg.category);
+                if (blockId && uniqueParticipantsByBlock.hasOwnProperty(blockId)) {
+                    (reg.registration_participants || []).forEach((p: any) => {
+                        const key = `${p.name?.trim().toLowerCase()}-${p.surnames?.trim().toLowerCase()}`;
+                        if (key && key !== '-') uniqueParticipantsByBlock[blockId as keyof typeof uniqueParticipantsByBlock].add(key);
+                    });
+
+                    (reg.registration_responsibles || []).forEach((r: any) => {
+                        const key = `${r.name?.trim().toLowerCase()}-${r.surnames?.trim().toLowerCase()}`;
+                        if (key && key !== '-') uniqueResponsiblesByBlock[blockId as keyof typeof uniqueResponsiblesByBlock].add(key);
+                    });
+                }
+            });
+
+            const uniqueParticipantsByBlockObj = {
+                block1: uniqueParticipantsByBlock.block1.size,
+                block2: uniqueParticipantsByBlock.block2.size,
+                block3: uniqueParticipantsByBlock.block3.size,
+                block4: uniqueParticipantsByBlock.block4.size,
+            };
+
+            const uniqueResponsiblesByBlockObj = {
+                block1: uniqueResponsiblesByBlock.block1.size,
+                block2: uniqueResponsiblesByBlock.block2.size,
+                block3: uniqueResponsiblesByBlock.block3.size,
+                block4: uniqueResponsiblesByBlock.block4.size,
+            };
 
             const schoolParts = participants.filter(p => regIds.includes(p.registration_id)).length;
             const schoolTickets = tickets.filter(t => t.registration_id && regIds.includes(t.registration_id));
@@ -595,6 +651,8 @@ export async function getSchoolsStatsAction() {
                 groups_count: schoolRegs.length,
                 participants_count: schoolParts,
                 tickets_by_block: ticketsByBlock,
+                unique_participants_by_block: uniqueParticipantsByBlockObj,
+                unique_responsibles_by_block: uniqueResponsiblesByBlockObj,
                 total_tickets: schoolTickets.length
             };
         });
