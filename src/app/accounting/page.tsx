@@ -287,9 +287,23 @@ export default async function AccountingPage() {
                     <div className="mb-6">
                         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Métricas Financieras</h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-slate-900 p-6 rounded-xl shadow-md border border-slate-800">
+                                <h3 className="text-slate-400 text-sm font-black uppercase tracking-wider">Total Ingresos Bruto</h3>
+                                <p className="text-4xl font-black text-white mt-2">{(dancersRevenueConfirmed + ticketsRevenueConfirmed) + (dancersRevenuePending + ticketsRevenuePending)}€</p>
+                                <div className="mt-2 pt-2 border-t border-slate-800 text-xs text-slate-400 space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>Bailarines Totales:</span>
+                                        <span className="font-bold text-slate-300">{dancersRevenueConfirmed + dancersRevenuePending}€</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Entradas Totales:</span>
+                                        <span className="font-bold text-slate-300">{ticketsRevenueConfirmed + ticketsRevenuePending}€</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 text-sm font-semibold uppercase">Ingresos Confirmados</h3>
-                                <p className="text-3xl font-bold text-green-600 mt-2">{totalRevenue}€</p>
+                                <p className="text-3xl font-bold text-green-600 mt-2">{dancersRevenueConfirmed + ticketsRevenueConfirmed}€</p>
                                 <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
                                     <div className="flex justify-between">
                                         <span>Bailarines:</span>
@@ -299,34 +313,21 @@ export default async function AccountingPage() {
                                         <span>Entradas (Grupos):</span>
                                         <span className="font-bold">{ticketsRevenueConfirmed}€</span>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span>Entradas (Web):</span>
-                                        <span className="font-bold">{onlineRevenue}€</span>
-                                    </div>
                                 </div>
                             </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 text-sm font-semibold uppercase">Pendiente de Cobro</h3>
-                                <p className="text-3xl font-bold text-yellow-600 mt-2">{totalPending}€</p>
+                                <p className="text-3xl font-bold text-yellow-600 mt-2">{dancersRevenuePending + ticketsRevenuePending}€</p>
                                 <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
                                     <div className="flex justify-between">
-                                        <span>Bailarines (Borr/Pend):</span>
+                                        <span>Bailarines (Enviados):</span>
                                         <span className="font-bold">{dancersRevenuePending}€</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Entradas (Borr/Pend):</span>
+                                        <span>Entradas (Enviadas):</span>
                                         <span className="font-bold">{ticketsRevenuePending}€</span>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span>Entradas (Web Pend):</span>
-                                        <span className="font-bold">{onlinePending}€</span>
-                                    </div>
                                 </div>
-                            </div>
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                <h3 className="text-slate-500 text-sm font-semibold uppercase">Solicitudes Web</h3>
-                                <p className="text-3xl font-bold text-slate-900 mt-2">{totalOrders}</p>
-                                <p className="text-xs text-slate-400">Pedidos de entradas sueltas</p>
                             </div>
                         </div>
                     </div>
