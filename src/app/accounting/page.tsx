@@ -147,11 +147,9 @@ export default async function AccountingPage() {
                 breakdown[block][cat].dancers_draft += participants;
                 breakdown[block][cat].tickets_draft += tickets;
 
-                // Add to globals (Pending)
+                // Add to globals (Possible, but NOT to revenue yet since it's just a draft)
                 possibleDancers += participants;
                 possibleTickets += tickets;
-                dancersRevenuePending += dancersVal;
-                ticketsRevenuePending += ticketsVal;
             } else {
                 breakdown[block][cat].dancers_confirmed += participants;
                 // [FIX] Include submitted tickets in breakdown count (Real Assigned)
