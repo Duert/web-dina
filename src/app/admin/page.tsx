@@ -2174,7 +2174,8 @@ export default function AdminPage() {
                                             is_confirmed: r.is_confirmed
                                         })));
 
-                                        const draftCount = schoolRegistrations.filter((r: any) => !r.status || r.status === 'draft' || r.status === 'submitted_modifiable').length;
+                                        const draftCount = schoolRegistrations.filter((r: any) => !r.status || r.status === 'draft').length;
+                                        const modifiableCount = schoolRegistrations.filter((r: any) => r.status === 'submitted_modifiable').length;
                                         const submittedCount = schoolRegistrations.filter((r: any) => r.status === 'submitted' && !r.is_confirmed).length;
                                         const verifiedCount = schoolRegistrations.filter((r: any) => r.is_confirmed === true).length;
 
@@ -2217,7 +2218,7 @@ export default function AdminPage() {
                                                 </div>
 
                                                 {/* Status Overview Row */}
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
                                                     <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                                                         <div className="text-xs font-bold text-gray-400 uppercase mb-1">Total Grupos</div>
                                                         <div className="text-2xl font-black text-white flex items-center gap-2">
@@ -2230,6 +2231,13 @@ export default function AdminPage() {
                                                         <div className="text-2xl font-black text-gray-300 flex items-center gap-2">
                                                             <AlertTriangle size={20} />
                                                             {draftCount}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                                                        <div className="text-xs font-bold text-gray-400 uppercase mb-1">Modificables</div>
+                                                        <div className="text-2xl font-black text-orange-400 flex items-center gap-2">
+                                                            <RefreshCw size={20} />
+                                                            {modifiableCount}
                                                         </div>
                                                     </div>
                                                     <div className="bg-white/5 border border-white/10 rounded-lg p-3">
