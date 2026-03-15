@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { SeatMap } from "@/components/seat-map";
-import { initialSeats } from "@/lib/data";
+import { initialSeats, sessions } from "@/lib/data";
 import { Seat, Ticket } from "@/types";
 import { Lock, Unlock, RefreshCw, User, Ticket as TicketIcon, UserPlus, ExternalLink } from "lucide-react";
 import Link from "next/link";
@@ -19,7 +19,26 @@ export default function AdminSeatingManager() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch tickets
+            // Paginated registrations fetch
+            let allRegs: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('registrations')
+                    .select('id, group_name, school_name, category, status, registration_participants(num_tickets)')
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+                if (error) throw error;
+                if (data && data.length > 0) {
+                    allRegs = [...allRegs, ...data];
+                    if (data.length < pageSize) hasMore = false;
+                } else { hasMore = false; }
+                page++;
+            }
+            setRegistrations(allRegs);
+
+            // Fetch tickets for current session
             const { data: ticketData, error: ticketError } = await supabase
                 .from('tickets')
                 .select('*')
@@ -27,14 +46,6 @@ export default function AdminSeatingManager() {
 
             if (ticketError) throw ticketError;
             setTickets(ticketData || []);
-
-            // Fetch registrations to map names
-            const { data: regData, error: regError } = await supabase
-                .from('registrations')
-                .select('id, group_name, school_name');
-
-            if (regError) throw regError;
-            setRegistrations(regData || []);
 
         } catch (error) {
             console.error("Error fetching seating data:", error);
@@ -48,35 +59,61 @@ export default function AdminSeatingManager() {
         fetchData();
     }, [fetchData]);
 
+    const getBlockCategories = (blockId: string) => {
+        const sess = sessions.find(s => s.id === blockId);
+        return sess ? sess.categoryRows.flat() : [];
+    };
+
     // Computed Seats
     const computedSeats = initialSeats.map(seat => {
         const ticket = tickets.find(t => t.seat_id === seat.id);
         let status: Seat['status'] = 'available';
 
         let assignedTo = undefined;
+        let schoolName = undefined;
 
         if (ticket) {
             if (ticket.status === 'sold') {
                 status = 'sold';
-                // Find group name
+                // Find group and school name
                 const reg = registrations.find(r => r.id === ticket.registration_id);
-                if (reg) assignedTo = reg.group_name;
+                if (reg) {
+                    assignedTo = reg.group_name;
+                    schoolName = reg.school_name;
+                }
                 // If no registration, it's a manual assignment, use assigned_to from ticket
-                else if (ticket.assigned_to) assignedTo = ticket.assigned_to;
+                else if (ticket.assigned_to) {
+                    assignedTo = ticket.assigned_to;
+                }
             }
             else if (ticket.status === 'blocked') status = 'blocked';
         }
 
-        return { ...seat, status, assignedTo, _ticket: ticket };
+        return { ...seat, status, assignedTo, groupName: assignedTo, schoolName, _ticket: ticket };
     });
 
-    // Stats
+    // Stats calculation matching Accounting
+    const capacity = 500;
+    const blockCategories = getBlockCategories(session);
+    const regSold = registrations
+        .filter(r => r.status !== 'draft' && blockCategories.includes(r.category))
+        .reduce((sum, r) => {
+            const companionTickets = r.registration_participants?.reduce((s: number, p: any) => s + (p.num_tickets || 0), 0) || 0;
+            return sum + companionTickets;
+        }, 0);
+
+    // Manual tickets (Sold but no registration_id)
+    const manualSold = tickets.filter(t => t.status === 'sold' && !t.registration_id).length;
+    const logicalSold = regSold + manualSold;
+    const physicalBlocked = tickets.filter(t => t.status === 'blocked').length;
+
     const stats = {
-        total: initialSeats.length,
-        sold: tickets.filter(t => t.status === 'sold').length,
-        blocked: tickets.filter(t => t.status === 'blocked').length,
-        occupied: tickets.filter(t => t.status === 'sold' || t.status === 'blocked').length,
-        available: initialSeats.length - tickets.filter(t => t.status === 'sold' || t.status === 'blocked').length
+        total: capacity,
+        sold: tickets.filter(t => t.status === 'sold').length, // Physical Sold
+        blocked: physicalBlocked,
+        occupied: tickets.filter(t => t.status === 'sold').length,
+        available: capacity - tickets.filter(t => t.status === 'sold').length,
+        physicalSold: tickets.filter(t => t.status === 'sold').length
     };
 
     // Handlers

@@ -50,20 +50,36 @@ export default async function AccountingPage() {
             return { data: allTickets, error: null };
         };
 
-        const [ordersResult, ticketsResult, registrationsResult] = await Promise.all([
-            supabaseAdmin.from('orders').select('*').order('created_at', { ascending: false }),
+        const fetchAllRegistrations = async () => {
+            let all: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+            while (hasMore) {
+                const { data, error } = await supabaseAdmin
+                    .from('registrations')
+                    .select('*, registration_participants(*), registration_responsibles(*)')
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+                if (error) throw error;
+                if (data && data.length > 0) {
+                    all = [...all, ...data];
+                    if (data.length < pageSize) hasMore = false;
+                } else { hasMore = false; }
+                page++;
+            }
+            return { data: all, error: null };
+        };
+
+        const [ticketsResult, regsResult] = await Promise.all([
             fetchAllTickets(),
-            supabaseAdmin.from('registrations')
-                .select('*, registration_participants(*), registration_responsibles(*)')
+            fetchAllRegistrations()
         ]);
 
-        if (ordersResult.error) throw ordersResult.error;
         if (ticketsResult.error) throw ticketsResult.error;
-        if (registrationsResult.error) throw registrationsResult.error;
+        if (regsResult.error) throw regsResult.error;
 
-        const orders = ordersResult.data;
         const tickets = ticketsResult.data;
-        const registrations = registrationsResult.data;
+        const registrations = regsResult.data;
 
         const schoolStatsResult = await getSchoolsStatsAction();
         const schoolStats = schoolStatsResult.success ? (schoolStatsResult.data as any[]) : [];
@@ -72,10 +88,8 @@ export default async function AccountingPage() {
         const PRICE_DANCER = 3.5;
         const PRICE_TICKET = 3;
 
-        // Order Calculations (Online Sales)
-        const onlineRevenue = orders?.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + o.total_amount, 0) || 0;
-        const onlinePending = orders?.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + o.total_amount, 0) || 0;
-        const totalOrders = orders?.filter(o => o.payment_status === 'paid' || o.payment_status === 'pending').length || 0;
+        // Order Calculations (Online Sales - REMOVED)
+        const totalOrders = 0; // Legacy placeholder
 
         // Registration & Dancer Calculations
         // Financials from Registrations (Detailed)
@@ -114,16 +128,14 @@ export default async function AccountingPage() {
         const grossDancersByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
         const grossResponsiblesByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
 
+        const uniqueDancersGlobal = new Set<string>();
+        const uniqueResponsiblesGlobal = new Set<string>();
+        let grossDancersGlobal = 0;
+        let grossResponsiblesGlobal = 0;
+
         const getBlockKeyFromCategory = (category: string) => {
-            const b1 = ['Infantil', 'Infantil Mini-parejas', 'Mini-Solistas Infantil'];
-            const b2 = ['Junior', 'Junior Mini-parejas', 'Mini-Solistas Junior'];
-            const b3 = ['Juvenil', 'Juvenil Parejas', 'Solistas Juvenil'];
-            const b4 = ['Absoluta', 'Parejas', 'Solistas Absoluta', 'Premium'];
-            if (b1.includes(category)) return 'block1';
-            if (b2.includes(category)) return 'block2';
-            if (b3.includes(category)) return 'block3';
-            if (b4.includes(category)) return 'block4';
-            return null;
+            const session = sessions.find(s => s.categoryRows.flat().includes(category));
+            return session ? session.id : null;
         };
 
         registrations?.forEach(reg => {
@@ -136,32 +148,29 @@ export default async function AccountingPage() {
             const participantsArr = reg.registration_participants || [];
             const responsiblesArr = reg.registration_responsibles || [];
 
-            const participants = participantsArr.length;
-            const tickets = participantsArr.reduce((s: number, p: any) => s + (p.num_tickets || 0), 0) || 0;
+            const participantsCount = participantsArr.length;
+            const companionTickets = participantsArr.reduce((s: number, p: any) => s + (p.num_tickets || 0), 0) || 0;
+            const totalTicketsForReg = companionTickets; // Dancers don't occupy seats
 
-            const dancersVal = participants * PRICE_DANCER;
-            const ticketsVal = tickets * PRICE_TICKET;
+            const dancersVal = participantsCount * PRICE_DANCER;
+            const ticketsVal = companionTickets * PRICE_TICKET;
             // const regValue = dancersVal + ticketsVal;
 
             if (reg.status === 'draft') {
-                breakdown[block][cat].dancers_draft += participants;
-                breakdown[block][cat].tickets_draft += tickets;
+                breakdown[block][cat].dancers_draft += participantsCount;
+                breakdown[block][cat].tickets_draft += totalTicketsForReg;
 
-                // Add to globals (Possible, but NOT to revenue yet since it's just a draft)
-                possibleDancers += participants;
-                possibleTickets += tickets;
+                possibleDancers += participantsCount;
+                possibleTickets += totalTicketsForReg;
             } else {
-                breakdown[block][cat].dancers_confirmed += participants;
-                // [FIX] Include submitted tickets in breakdown count (Real Assigned)
-                breakdown[block][cat].tickets_confirmed += tickets;
+                breakdown[block][cat].dancers_confirmed += participantsCount;
+                breakdown[block][cat].tickets_confirmed += totalTicketsForReg;
 
-                // Add to globals
-                totalDancers += participants;
-                totalTicketsAssigned += tickets; // [FIX] Count for KPI card (Real Assigned)
+                totalDancers += participantsCount;
+                totalTicketsAssigned += totalTicketsForReg;
 
                 if (reg.is_confirmed) {
-                    // Add to globals (Confirmed Revenue/Stats)
-                    confirmedTickets += tickets;
+                    confirmedTickets += totalTicketsForReg;
                     dancersRevenueConfirmed += dancersVal;
                     ticketsRevenueConfirmed += ticketsVal;
                 } else {
@@ -176,13 +185,22 @@ export default async function AccountingPage() {
                     grossDancersByBlock[blockKey as keyof typeof grossDancersByBlock] += participantsArr.length;
                     grossResponsiblesByBlock[blockKey as keyof typeof grossResponsiblesByBlock] += responsiblesArr.length;
 
+                    grossDancersGlobal += participantsArr.length;
+                    grossResponsiblesGlobal += responsiblesArr.length;
+
                     participantsArr.forEach((p: any) => {
                         const key = `${p.name?.trim().toLowerCase()}-${p.surnames?.trim().toLowerCase()}`;
-                        if (key && key !== '-') uniqueDancersByBlock[blockKey as keyof typeof uniqueDancersByBlock].add(key);
+                        if (key && key !== '-') {
+                            uniqueDancersByBlock[blockKey as keyof typeof uniqueDancersByBlock].add(key);
+                            uniqueDancersGlobal.add(key);
+                        }
                     });
                     responsiblesArr.forEach((r: any) => {
                         const key = `${r.name?.trim().toLowerCase()}-${r.surnames?.trim().toLowerCase()}`;
-                        if (key && key !== '-') uniqueResponsiblesByBlock[blockKey as keyof typeof uniqueResponsiblesByBlock].add(key);
+                        if (key && key !== '-') {
+                            uniqueResponsiblesByBlock[blockKey as keyof typeof uniqueResponsiblesByBlock].add(key);
+                            uniqueResponsiblesGlobal.add(key);
+                        }
                     });
                 }
             }
@@ -192,70 +210,122 @@ export default async function AccountingPage() {
         const nonRegTickets = tickets?.filter(t => !t.registration_id && t.status === 'sold') || [];
 
         nonRegTickets.forEach(t => {
-            // Determine Block
             const session = sessions.find(s => s.id === t.session_id);
             const blockName = session ? session.name : "Desconocido";
 
-            // Determine Category (Fake category for breakdown)
             const isFree = (t.price || 0) === 0;
-            const categoryName = isFree ? "Organización / Invitaciones" : "Entradas Sueltas (Web)";
+            const categoryName = isFree ? "Organización / Invitaciones" : "Venta Manual";
 
             if (!breakdown[blockName]) breakdown[blockName] = {};
             if (!breakdown[blockName][categoryName]) {
-                breakdown[blockName][categoryName] = {
-                    dancers_confirmed: 0,
-                    dancers_draft: 0,
-                    tickets_confirmed: 0,
-                    tickets_draft: 0
-                };
+                breakdown[blockName][categoryName] = { dancers_confirmed: 0, dancers_draft: 0, tickets_confirmed: 0, tickets_draft: 0 };
             }
 
-            // Increment Ticket Count
             breakdown[blockName][categoryName].tickets_confirmed += 1;
             confirmedTickets += 1;
-            totalTicketsAssigned += 1; // [FIX] Include manual/online in assigned count
-
-            // Revenue is NOT added here because:
-            // 1. Organization tickets match user requirement "no tienen coste".
-            // 2. Online/Paid tickets are calculated via 'onlineRevenue' (from orders table) or 'totalRevenue'.
-            // wait, totalRevenue = onlineRevenue + registrationRevenue.
-            // If these 'Venta Online' tickets correspond to orders, their money is in onlineRevenue.
-            // If they are manual sales physically paid, we might be missing them if not in 'orders'.
-            // But usually Admin manual assigns are free.
-            // Let's assume for now revenue is handled by orders/registrations.
+            totalTicketsAssigned += 1;
         });
 
-        const totalRevenue = onlineRevenue + dancersRevenueConfirmed + ticketsRevenueConfirmed;
-        const totalPending = onlinePending + dancersRevenuePending + ticketsRevenuePending;
+        // Calculate logical totals per block for consistent KPI cards
+        const blockTotals = sessions.reduce((acc, sess) => {
+            const bName = sess.name;
+            const categories = breakdown[bName] || {};
+            const confirmed = Object.values(categories).reduce((sum, cat) => sum + cat.tickets_confirmed, 0);
+            const draft = Object.values(categories).reduce((sum, cat) => sum + cat.tickets_draft, 0);
+            acc[sess.id] = { confirmed, draft };
+            return acc;
+        }, {} as Record<string, { confirmed: number, draft: number }>);
+
         const processSession = (sessionId: string) => {
             const sessionTickets = tickets?.filter(t => t.session_id === sessionId) || [];
+            const blockLogicalStats = blockTotals[sessionId] || { confirmed: 0, draft: 0 };
 
-            // Map Status
-            const ticketMap = new Map();
-            sessionTickets.forEach(t => ticketMap.set(t.seat_id, t.status));
+            const seats: Seat[] = initialSeats.map(seat => {
+                const ticket = sessionTickets.find(t => t.seat_id === seat.id);
+                let status: Seat['status'] = 'available';
+                let groupName = undefined;
+                let schoolName = undefined;
+                let assignedTo = undefined;
 
-            const seats: Seat[] = initialSeats.map(seat => ({
-                ...seat,
-                status: ticketMap.get(seat.id) || 'available'
-            }));
+                if (ticket) {
+                    status = ticket.status as any;
+                    if (status === 'sold') {
+                        const reg = registrations?.find(r => r.id === ticket.registration_id);
+                        if (reg) {
+                            groupName = reg.group_name;
+                            schoolName = reg.school_name;
+                            assignedTo = reg.group_name;
+                        } else {
+                            assignedTo = ticket.assigned_to;
+                            groupName = ticket.assigned_to;
+                        }
+                    }
+                }
 
-            const soldCount = sessionTickets.filter(t => t.status === 'sold').length;
+                return {
+                    ...seat,
+                    status,
+                    groupName,
+                    schoolName,
+                    assignedTo
+                };
+            });
+
+            // Physical counts
+            const physicalSold = sessionTickets.filter(t => t.status === 'sold').length;
             const blockedCount = sessionTickets.filter(t => t.status === 'blocked').length;
-            const occupiedCount = soldCount + blockedCount;
-            const availableCount = initialSeats.length - occupiedCount;
 
-            // Calculate revenue from sold tickets only
-            const revenue = sessionTickets
-                .filter(t => t.status === 'sold')
-                .reduce((sum, t) => sum + PRICE_TICKET, 0); // Force 3€ (PRICE_TICKET) always
+            // NEW SIMPLIFIED LOGIC: Match the map exactly
+            const capacity = 500;
+            const soldCount = physicalSold;
+            const availableCount = capacity - soldCount;
 
-            return { seats, soldCount, blockedCount, occupiedCount, availableCount, revenue };
+            // Granular availability breakdown
+            const availableBreakdown = {
+                patio: 0,
+                anfiteatro: 0,
+                pmr: 0
+            };
+
+            seats.forEach(s => {
+                if (s.status === 'available') {
+                    if (s.type === 'pmr') {
+                        availableBreakdown.pmr++;
+                    } else if (s.zone === 'Zona 3') {
+                        availableBreakdown.anfiteatro++;
+                    } else {
+                        availableBreakdown.patio++;
+                    }
+                }
+            });
+
+            // Revenue from all confirmed tickets
+            const revenue = blockLogicalStats.confirmed * PRICE_TICKET;
+
+            return { 
+                seats, 
+                soldCount, 
+                blockedCount, 
+                occupiedCount: soldCount, 
+                availableCount, 
+                revenue, 
+                physicalSold, 
+                capacity,
+                availableBreakdown 
+            };
         };
 
         const block1Stats = processSession('block1');
         const block2Stats = processSession('block2');
         const block3Stats = processSession('block3');
         const block4Stats = processSession('block4');
+
+        // [FIX] Physical sum of assigned seats for absolute parity with reality
+        totalTicketsAssigned = block1Stats.soldCount + block2Stats.soldCount + block3Stats.soldCount + block4Stats.soldCount;
+
+        const totalRevenue = (dancersRevenueConfirmed + ticketsRevenueConfirmed);
+        const totalPending = (dancersRevenuePending + ticketsRevenuePending);
+
 
         return (
             <div className="min-h-screen bg-slate-50 p-8">
@@ -269,7 +339,7 @@ export default async function AccountingPage() {
                         </div>
 
                         <div className="flex gap-3">
-                            <ExportButton orders={orders || []} />
+                            {/* ExportButton removed as it relied on orders */}
 
                             <form action={async () => {
                                 'use server';
@@ -287,9 +357,13 @@ export default async function AccountingPage() {
                     <div className="mb-6">
                         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Métricas Financieras</h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white p-6 rounded-xl border border-slate-200">
+                                <div className="text-sm font-bold text-slate-400 mb-1 uppercase tracking-wider">AFORO</div>
+                                <div className="text-4xl font-black text-slate-900 tracking-tighter">2.000 <span className="text-sm font-bold text-slate-400">BUTACAS</span></div>
+                            </div>
                             <div className="bg-slate-900 p-6 rounded-xl shadow-md border border-slate-800">
                                 <h3 className="text-slate-400 text-sm font-black uppercase tracking-wider">Total Ingresos Bruto</h3>
-                                <p className="text-4xl font-black text-white mt-2">{(dancersRevenueConfirmed + ticketsRevenueConfirmed) + (dancersRevenuePending + ticketsRevenuePending)}€</p>
+                                <p className="text-4xl font-black text-white mt-2">{totalRevenue + totalPending}€</p>
                                 <div className="mt-2 pt-2 border-t border-slate-800 text-xs text-slate-400 space-y-1">
                                     <div className="flex justify-between">
                                         <span>Bailarines Totales:</span>
@@ -303,7 +377,7 @@ export default async function AccountingPage() {
                             </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 text-sm font-semibold uppercase">Ingresos Confirmados</h3>
-                                <p className="text-3xl font-bold text-green-600 mt-2">{dancersRevenueConfirmed + ticketsRevenueConfirmed}€</p>
+                                <p className="text-3xl font-bold text-green-600 mt-2">{totalRevenue}€</p>
                                 <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
                                     <div className="flex justify-between">
                                         <span>Bailarines:</span>
@@ -317,7 +391,7 @@ export default async function AccountingPage() {
                             </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                                 <h3 className="text-slate-500 text-sm font-semibold uppercase">Pendiente de Cobro</h3>
-                                <p className="text-3xl font-bold text-yellow-600 mt-2">{dancersRevenuePending + ticketsRevenuePending}€</p>
+                                <p className="text-3xl font-bold text-yellow-600 mt-2">{totalPending}€</p>
                                 <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
                                     <div className="flex justify-between">
                                         <span>Bailarines (Enviados):</span>
@@ -349,7 +423,7 @@ export default async function AccountingPage() {
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-green-500">
                                 <h3 className="text-slate-500 text-sm font-bold uppercase">Entradas Asignadas</h3>
                                 <p className="text-2xl font-black text-green-600 mt-1">{totalTicketsAssigned}</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Inscripciones enviadas + Sueltas</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Suma real de butacas ocupadas en el mapa</p>
                             </div>
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-green-200">
                                 <h3 className="text-slate-500 text-[10px] font-bold uppercase">Entradas Posibles</h3>
@@ -362,7 +436,7 @@ export default async function AccountingPage() {
                     {/* KPI Cards: Global Block Attendance (Gross vs Unique) */}
                     <div className="mb-10">
                         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Total Bailarines y Responsables por Bloque (Con vs Sin Duplicidades)</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             {['block1', 'block2', 'block3', 'block4'].map((b, idx) => {
                                 const bp = b as keyof typeof grossDancersByBlock;
                                 const bn = `Bloque ${idx + 1}`;
@@ -396,6 +470,35 @@ export default async function AccountingPage() {
                                     </div>
                                 )
                             })}
+
+                            {/* Total Día Card */}
+                            <div className="bg-slate-900 text-white p-5 rounded-xl shadow-sm border border-slate-800">
+                                <h3 className="text-slate-400 font-bold uppercase mb-3 flex items-center justify-between">
+                                    <span>Total Día</span>
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="bg-slate-800 p-2 rounded-lg flex justify-between items-center border border-slate-700">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Bailarines</span>
+                                            <span className="text-xs text-slate-500 font-medium">Inscritos</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xl font-black text-white leading-none">{grossDancersGlobal}</p>
+                                            <p className="text-[10px] text-blue-400 font-bold flex items-center gap-1 justify-end mt-1"><CheckCircle size={10} /> {uniqueDancersGlobal.size} únicos</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-800 p-2 rounded-lg flex justify-between items-center border border-slate-700">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Responsables</span>
+                                            <span className="text-xs text-slate-500 font-medium">Inscritos</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xl font-black text-white leading-none">{grossResponsiblesGlobal}</p>
+                                            <p className="text-[10px] text-purple-400 font-bold flex items-center gap-1 justify-end mt-1"><CheckCircle size={10} /> {uniqueResponsiblesGlobal.size} únicos</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -408,25 +511,27 @@ export default async function AccountingPage() {
                                     <Users className="text-blue-500" />
                                     Bloque 1
                                 </h3>
-                                <div className="mt-4 flex justify-between items-end border-b pb-4">
-                                    <div className="flex gap-6">
-                                        <div>
-                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
-                                            <p className="text-4xl font-black text-indigo-600 mt-1">
-                                                {block1Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-col justify-end pb-1.5">
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block1Stats.occupiedCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block1Stats.soldCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block1Stats.blockedCount}</span></p>
+                                    <div className="flex-1">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1">Bloque 1 - {(new Date(sessions[0].date)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}h</div>
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-3xl font-black text-green-600">
+                                                {block1Stats.availableCount} <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">QUEDAN</span>
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-500 flex gap-1">
+                                                <span>({block1Stats.availableCount - block1Stats.availableBreakdown.pmr}<span className="text-slate-600">N</span></span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-blue-500">{block1Stats.availableBreakdown.patio}P</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-orange-500">{block1Stats.availableBreakdown.anfiteatro}A</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-pink-500">{block1Stats.availableBreakdown.pmr}PMR)</span>
+                                            </div>
+                                            <div className="ml-auto flex items-baseline gap-1">
+                                                <div className="text-xl font-black text-slate-900">{block1Stats.soldCount}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ASIGNADAS</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
-                                        <p className="text-xl font-bold text-green-600">{block1Stats.revenue}€</p>
-                                    </div>
-                                </div>
                             </div>
                             <AdminSeatMapModal
                                 sessionId="block1"
@@ -448,25 +553,27 @@ export default async function AccountingPage() {
                                     <Users className="text-blue-500" />
                                     Bloque 2
                                 </h3>
-                                <div className="mt-4 flex justify-between items-end border-b pb-4">
-                                    <div className="flex gap-6">
-                                        <div>
-                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
-                                            <p className="text-4xl font-black text-indigo-600 mt-1">
-                                                {block2Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-col justify-end pb-1.5">
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block2Stats.occupiedCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block2Stats.soldCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block2Stats.blockedCount}</span></p>
+                                    <div className="flex-1">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1">Bloque 2 - {(new Date(sessions[1].date)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}h</div>
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-3xl font-black text-green-600">
+                                                {block2Stats.availableCount} <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">QUEDAN</span>
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-500 flex gap-1">
+                                                <span>({block2Stats.availableCount - block2Stats.availableBreakdown.pmr}<span className="text-slate-600">N</span></span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-blue-500">{block2Stats.availableBreakdown.patio}P</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-orange-500">{block2Stats.availableBreakdown.anfiteatro}A</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-pink-500">{block2Stats.availableBreakdown.pmr}PMR)</span>
+                                            </div>
+                                            <div className="ml-auto flex items-baseline gap-1">
+                                                <div className="text-xl font-black text-slate-900">{block2Stats.soldCount}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ASIGNADAS</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
-                                        <p className="text-xl font-bold text-green-600">{block2Stats.revenue}€</p>
-                                    </div>
-                                </div>
                             </div>
                             <AdminSeatMapModal
                                 sessionId="block2"
@@ -488,25 +595,27 @@ export default async function AccountingPage() {
                                     <Users className="text-pink-500" />
                                     Bloque 3
                                 </h3>
-                                <div className="mt-4 flex justify-between items-end border-b pb-4">
-                                    <div className="flex gap-6">
-                                        <div>
-                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
-                                            <p className="text-4xl font-black text-indigo-600 mt-1">
-                                                {block3Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-col justify-end pb-1.5">
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block3Stats.occupiedCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block3Stats.soldCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block3Stats.blockedCount}</span></p>
+                                    <div className="flex-1">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1">Bloque 3 - {(new Date(sessions[2].date)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}h</div>
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-3xl font-black text-green-600">
+                                                {block3Stats.availableCount} <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">QUEDAN</span>
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-500 flex gap-1">
+                                                <span>({block3Stats.availableCount - block3Stats.availableBreakdown.pmr}<span className="text-slate-600">N</span></span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-blue-500">{block3Stats.availableBreakdown.patio}P</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-orange-500">{block3Stats.availableBreakdown.anfiteatro}A</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-pink-500">{block3Stats.availableBreakdown.pmr}PMR)</span>
+                                            </div>
+                                            <div className="ml-auto flex items-baseline gap-1">
+                                                <div className="text-xl font-black text-slate-900">{block3Stats.soldCount}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ASIGNADAS</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
-                                        <p className="text-xl font-bold text-green-600">{block3Stats.revenue}€</p>
-                                    </div>
-                                </div>
                             </div>
                             <AdminSeatMapModal
                                 sessionId="block3"
@@ -528,25 +637,27 @@ export default async function AccountingPage() {
                                     <Users className="text-pink-500" />
                                     Bloque 4
                                 </h3>
-                                <div className="mt-4 flex justify-between items-end border-b pb-4">
-                                    <div className="flex gap-6">
-                                        <div>
-                                            <p className="text-xs text-slate-500 uppercase font-bold">Disponibles</p>
-                                            <p className="text-4xl font-black text-indigo-600 mt-1">
-                                                {block4Stats.availableCount} <span className="text-lg text-slate-400 font-medium">/ {initialSeats.length}</span>
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-col justify-end pb-1.5">
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Ocupadas: <span className="text-slate-900">{block4Stats.occupiedCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Vendidas: <span className="text-green-600 font-bold">{block4Stats.soldCount}</span></p>
-                                            <p className="text-[10px] text-slate-500 font-medium">Bloqueadas: <span className="text-red-500 font-bold">{block4Stats.blockedCount}</span></p>
+                                    <div className="flex-1">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1">Bloque 4 - {(new Date(sessions[3].date)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}h</div>
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-3xl font-black text-green-600">
+                                                {block4Stats.availableCount} <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">QUEDAN</span>
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-500 flex gap-1">
+                                                <span>({block4Stats.availableCount - block4Stats.availableBreakdown.pmr}<span className="text-slate-600">N</span></span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-blue-500">{block4Stats.availableBreakdown.patio}P</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-orange-500">{block4Stats.availableBreakdown.anfiteatro}A</span>
+                                                <span className="text-slate-400">|</span>
+                                                <span className="text-pink-500">{block4Stats.availableBreakdown.pmr}PMR)</span>
+                                            </div>
+                                            <div className="ml-auto flex items-baseline gap-1">
+                                                <div className="text-xl font-black text-slate-900">{block4Stats.soldCount}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ASIGNADAS</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-500 uppercase font-bold">Recaudación</p>
-                                        <p className="text-xl font-bold text-green-600">{block4Stats.revenue}€</p>
-                                    </div>
-                                </div>
                             </div>
                             <AdminSeatMapModal
                                 sessionId="block4"
@@ -625,94 +736,7 @@ export default async function AccountingPage() {
                         </div>
                     </div>
 
-                    {/* Desglose por Escuelas (Aforo) */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-10">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                            <h2 className="font-bold text-slate-800">Desglose por Escuela (Bailarines y Responsables Únicos por Bloque)</h2>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 text-slate-500 font-semibold uppercase border-b text-[10px]">
-                                    <tr>
-                                        <th className="px-4 py-3 min-w-[150px]">Escuela</th>
-                                        <th className="px-4 py-3 text-center">B1</th>
-                                        <th className="px-4 py-3 text-center bg-slate-50/50">B2</th>
-                                        <th className="px-4 py-3 text-center">B3</th>
-                                        <th className="px-4 py-3 text-center bg-slate-50/50">B4</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {schoolStats.map((school, i) => (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-4 py-3">
-                                                <div className="font-bold text-slate-800">{school.school_name}</div>
-                                                <div className="text-[10px] text-slate-400 uppercase">{school.rep_name} {school.rep_surnames}</div>
-                                            </td>
-                                            <td className="px-4 py-2 text-center align-top">
-                                                <div className="flex flex-col gap-1 items-center">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block1 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
-                                                        🎟️ {school.tickets_by_block?.block1 || 0}
-                                                    </span>
-                                                    {(school.unique_participants_by_block?.block1 || 0) > 0 && (
-                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block1}</span>
-                                                    )}
-                                                    {(school.unique_responsibles_by_block?.block1 || 0) > 0 && (
-                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block1}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2 text-center align-top bg-slate-50/30">
-                                                <div className="flex flex-col gap-1 items-center">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block2 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
-                                                        🎟️ {school.tickets_by_block?.block2 || 0}
-                                                    </span>
-                                                    {(school.unique_participants_by_block?.block2 || 0) > 0 && (
-                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block2}</span>
-                                                    )}
-                                                    {(school.unique_responsibles_by_block?.block2 || 0) > 0 && (
-                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block2}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2 text-center align-top">
-                                                <div className="flex flex-col gap-1 items-center">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block3 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
-                                                        🎟️ {school.tickets_by_block?.block3 || 0}
-                                                    </span>
-                                                    {(school.unique_participants_by_block?.block3 || 0) > 0 && (
-                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block3}</span>
-                                                    )}
-                                                    {(school.unique_responsibles_by_block?.block3 || 0) > 0 && (
-                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block3}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2 text-center align-top bg-slate-50/30">
-                                                <div className="flex flex-col gap-1 items-center">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${(school.tickets_by_block?.block4 || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`} title="Entradas Totales">
-                                                        🎟️ {school.tickets_by_block?.block4 || 0}
-                                                    </span>
-                                                    {(school.unique_participants_by_block?.block4 || 0) > 0 && (
-                                                        <span className="text-[10px] text-blue-600 font-medium" title="Bailarines Únicos">👥 {school.unique_participants_by_block.block4}</span>
-                                                    )}
-                                                    {(school.unique_responsibles_by_block?.block4 || 0) > 0 && (
-                                                        <span className="text-[10px] text-purple-600 font-medium" title="Responsables Únicos">👤 {school.unique_responsibles_by_block.block4}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {schoolStats.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
-                                                No hay datos de escuelas para mostrar.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         );

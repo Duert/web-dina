@@ -9,6 +9,8 @@ export interface Seat {
     type: 'standard' | 'pmr';
     price?: number;
     assignedTo?: string;
+    groupName?: string;
+    schoolName?: string;
     registration_id?: string | null; // For database tickets
     is_free?: boolean; // Whether ticket is free or paid
 }

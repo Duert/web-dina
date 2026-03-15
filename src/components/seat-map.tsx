@@ -45,7 +45,8 @@ const GAP_CONFIG = [
 export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = false }: SeatMapProps) {
     const [scale, setScale] = useState(0.8);
     const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
-    const [tooltipInfo, setTooltipInfo] = useState<{ x: number; y: number; groupKey: string } | null>(null);
+    const [hoveredSchool, setHoveredSchool] = useState<string | null>(null);
+    const [tooltipInfo, setTooltipInfo] = useState<{ x: number; y: number; groupName: string; schoolName: string; tickets: number } | null>(null);
 
     const rows = useMemo(() => {
         if (!seats || !Array.isArray(seats) || seats.length === 0) return {};
@@ -72,26 +73,33 @@ export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = fa
         return grouped;
     }, [seats]);
 
-    // Agrupar butacas por registration_id o assigned_to
-    const groupedSeats = useMemo(() => {
-        const groups: Record<string, Seat[]> = {};
-        seats.forEach(seat => {
-            if (seat.status === 'sold') {
-                const key = seat.registration_id || seat.assignedTo || 'unknown';
-                if (!groups[key]) groups[key] = [];
-                groups[key].push(seat);
+    // Metadata map for schools/groups to avoid repeated lookups
+    const seatMetadata = useMemo(() => {
+        const meta: Record<string, { group: string, school: string }> = {};
+        seats.forEach(s => {
+            if (s.status === 'sold') {
+                meta[s.id] = {
+                    group: s.groupName || s.assignedTo || 'Sin grupo',
+                    school: s.schoolName || 'Sin escuela'
+                };
             }
         });
-        return groups;
+        return meta;
     }, [seats]);
 
     const isSelected = (seat: Seat) => selectedSeats.some((s) => s.id === seat.id);
 
-    // Comprobar si una butaca pertenece al grupo destacado
-    const isInHighlightedGroup = (seat: Seat) => {
-        if (!hoveredGroup || seat.status !== 'sold') return false;
-        const key = seat.registration_id || seat.assignedTo || 'unknown';
-        return key === hoveredGroup;
+    // Comprobar si una butaca pertenece al grupo o escuela destacada
+    const getHighlightLevel = (seat: Seat): 'none' | 'group' | 'school' => {
+        if (seat.status !== 'sold') return 'none';
+        
+        const group = seat.groupName || seat.assignedTo;
+        const school = seat.schoolName;
+
+        if (hoveredGroup && group === hoveredGroup) return 'group';
+        if (hoveredSchool && school === hoveredSchool) return 'school';
+        
+        return 'none';
     };
 
     // Helper to check gaps
@@ -104,26 +112,25 @@ export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = fa
         <div className="flex flex-col h-full w-full bg-white relative">
 
             {/* Tooltip de información del grupo */}
-            {tooltipInfo && groupedSeats[tooltipInfo.groupKey] && (
+            {tooltipInfo && (
                 <div
-                    className="fixed z-[100] bg-slate-900 text-white px-4 py-3 rounded-lg shadow-2xl pointer-events-none max-w-sm"
+                    className="fixed z-[100] bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl pointer-events-none border border-white/10 flex flex-col gap-1 min-w-[200px]"
                     style={{
                         left: `${tooltipInfo.x + 15}px`,
                         top: `${tooltipInfo.y - 10}px`,
                         transform: 'translateY(-100%)'
                     }}
                 >
-                    <div className="font-bold text-sm mb-1">
-                        {groupedSeats[tooltipInfo.groupKey][0]?.assignedTo ||
-                            `Inscripción ${tooltipInfo.groupKey.substring(0, 8)}...`}
+                    <div className="flex justify-between items-start gap-4">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Grupo</span>
+                            <span className="font-bold text-sm text-yellow-400">{tooltipInfo.groupName}</span>
+                        </div>
+                        <div className="bg-slate-800 px-2 py-0.5 rounded text-[10px] font-black">{tooltipInfo.tickets} BUT.</div>
                     </div>
-                    <div className="text-xs text-slate-300 mb-2">
-                        {groupedSeats[tooltipInfo.groupKey].length} {groupedSeats[tooltipInfo.groupKey].length === 1 ? 'butaca' : 'butacas'}
-                    </div>
-                    <div className="text-xs text-slate-400 max-h-32 overflow-y-auto">
-                        {groupedSeats[tooltipInfo.groupKey]
-                            .map(s => s.id)
-                            .join(', ')}
+                    <div className="mt-1 pt-1 border-t border-white/5">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Escuela</span>
+                        <span className="text-xs font-semibold text-white">{tooltipInfo.schoolName}</span>
                     </div>
                 </div>
             )}
@@ -156,17 +163,32 @@ export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = fa
                                     seats={rowSeats}
                                     gaps={gaps}
                                     isSelected={isSelected}
-                                    isInHighlightedGroup={isInHighlightedGroup}
+                                    getHighlightLevel={getHighlightLevel}
                                     onSeatToggle={onSeatToggle}
                                     onSeatHover={(seat: Seat | null, e?: React.MouseEvent) => {
                                         if (!seat) {
                                             setHoveredGroup(null);
+                                            setHoveredSchool(null);
                                             setTooltipInfo(null);
                                         } else if (seat.status === 'sold') {
-                                            const key = seat.registration_id || seat.assignedTo || 'unknown';
-                                            setHoveredGroup(key);
+                                            const group = seat.groupName || seat.assignedTo || 'Desconocido';
+                                            const school = seat.schoolName || 'Sin escuela';
+                                            const ticketsCount = seats.filter(s => 
+                                                s.status === 'sold' && 
+                                                (s.groupName === group || s.assignedTo === group) && 
+                                                s.schoolName === school
+                                            ).length;
+
+                                            setHoveredGroup(group);
+                                            setHoveredSchool(school);
                                             if (e) {
-                                                setTooltipInfo({ x: e.clientX, y: e.clientY, groupKey: key });
+                                                setTooltipInfo({ 
+                                                    x: e.clientX, 
+                                                    y: e.clientY, 
+                                                    groupName: group, 
+                                                    schoolName: school, 
+                                                    tickets: ticketsCount 
+                                                });
                                             }
                                         }
                                     }}
@@ -199,17 +221,32 @@ export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = fa
                                     seats={rowSeats}
                                     gaps={gaps}
                                     isSelected={isSelected}
-                                    isInHighlightedGroup={isInHighlightedGroup}
+                                    getHighlightLevel={getHighlightLevel}
                                     onSeatToggle={onSeatToggle}
                                     onSeatHover={(seat: Seat | null, e?: React.MouseEvent) => {
                                         if (!seat) {
                                             setHoveredGroup(null);
+                                            setHoveredSchool(null);
                                             setTooltipInfo(null);
                                         } else if (seat.status === 'sold') {
-                                            const key = seat.registration_id || seat.assignedTo || 'unknown';
-                                            setHoveredGroup(key);
+                                            const group = seat.groupName || seat.assignedTo || 'Desconocido';
+                                            const school = seat.schoolName || 'Sin escuela';
+                                            const ticketsCount = seats.filter(s => 
+                                                s.status === 'sold' && 
+                                                (s.groupName === group || s.assignedTo === group) && 
+                                                s.schoolName === school
+                                            ).length;
+
+                                            setHoveredGroup(group);
+                                            setHoveredSchool(school);
                                             if (e) {
-                                                setTooltipInfo({ x: e.clientX, y: e.clientY, groupKey: key });
+                                                setTooltipInfo({ 
+                                                    x: e.clientX, 
+                                                    y: e.clientY, 
+                                                    groupName: group, 
+                                                    schoolName: school, 
+                                                    tickets: ticketsCount 
+                                                });
                                             }
                                         }
                                     }}
@@ -244,7 +281,7 @@ export function SeatMap({ seats, selectedSeats = [], onSeatToggle, readonly = fa
 }
 
 // Sub-component for rendering a single row with gaps
-function RowRenderer({ rowNum, displayRowNum, seats, gaps, isSelected, isInHighlightedGroup, onSeatToggle, onSeatHover, readonly }: any) {
+function RowRenderer({ rowNum, displayRowNum, seats, gaps, isSelected, getHighlightLevel, onSeatToggle, onSeatHover, readonly }: any) {
     const rLabel = displayRowNum || rowNum;
 
     return (
@@ -258,7 +295,7 @@ function RowRenderer({ rowNum, displayRowNum, seats, gaps, isSelected, isInHighl
                     <SeatButton
                         seat={seat}
                         selected={isSelected(seat)}
-                        isHighlighted={isInHighlightedGroup(seat)}
+                        highlightLevel={getHighlightLevel(seat)}
                         onSeatToggle={onSeatToggle}
                         onSeatHover={onSeatHover}
                         readonly={readonly}
@@ -275,10 +312,13 @@ function RowRenderer({ rowNum, displayRowNum, seats, gaps, isSelected, isInHighl
 }
 
 
-function settingsForSeat(seat: Seat, selected: boolean, isHighlighted: boolean) {
+function settingsForSeat(seat: Seat, selected: boolean, highlightLevel: 'none' | 'group' | 'school') {
     if (seat.status === 'sold') {
-        if (isHighlighted) {
-            return "bg-blue-500 border-2 border-blue-700 text-white font-bold shadow-lg ring-4 ring-blue-300 scale-110 z-30";
+        if (highlightLevel === 'group') {
+            return "bg-yellow-400 border-2 border-yellow-600 text-yellow-900 font-bold shadow-lg ring-4 ring-yellow-200 scale-110 z-30";
+        }
+        if (highlightLevel === 'school') {
+            return "bg-cyan-400 border-2 border-cyan-600 text-cyan-900 font-bold shadow-md ring-4 ring-cyan-100 scale-105 z-20";
         }
         return STATUS_STYLES.sold;
     }
@@ -293,14 +333,14 @@ function settingsForSeat(seat: Seat, selected: boolean, isHighlighted: boolean) 
 function SeatButton({
     seat,
     selected,
-    isHighlighted = false,
+    highlightLevel = 'none',
     onSeatToggle,
     onSeatHover,
     readonly
 }: {
     seat: Seat,
     selected: boolean,
-    isHighlighted?: boolean,
+    highlightLevel?: 'none' | 'group' | 'school',
     onSeatToggle?: (s: Seat, e: React.MouseEvent) => void,
     onSeatHover?: (seat: Seat | null, e?: React.MouseEvent) => void,
     readonly: boolean
@@ -312,14 +352,16 @@ function SeatButton({
 
     return (
         <button
-            disabled={isDisabled}
-            onClick={(e) => !readonly && onSeatToggle && onSeatToggle(seat, e)}
+            onClick={(e) => {
+                if (isDisabled) return;
+                !readonly && onSeatToggle && onSeatToggle(seat, e);
+            }}
             onMouseEnter={(e) => onSeatHover && onSeatHover(seat, e)}
             onMouseLeave={() => onSeatHover && onSeatHover(null)}
             title={`${seat.zone} - Fila ${seat.row} | Asiento ${seat.number}${seat.assignedTo ? `\nAsignado a: ${seat.assignedTo}` : ''}${seat.status === 'blocked' ? '\nBLOQUEADO (Organización)' : ''}`}
             className={cn(
                 "w-6 h-6 flex items-center justify-center text-[9px] font-bold transition-all duration-200 rounded-[2px] shrink-0 select-none",
-                settingsForSeat(seat, selected, isHighlighted)
+                settingsForSeat(seat, selected, highlightLevel)
             )}
         >
             {isSold ? <User size={10} className="opacity-0" /> : selected ? <Check size={12} strokeWidth={4} /> : seat.number}
