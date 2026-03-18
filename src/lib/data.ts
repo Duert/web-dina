@@ -62,9 +62,7 @@ export const sessions: Session[] = [
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [
-            ['Infantil'],
-            ['Infantil Mini-parejas'],
-            ['Mini-Solistas Infantil']
+            ['Infantil', 'Infantil Mini-parejas']
         ]
     },
     {
@@ -74,9 +72,7 @@ export const sessions: Session[] = [
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [
-            ['Junior'],
-            ['Junior Mini-parejas'],
-            ['Mini-Solistas Junior']
+            ['Junior', 'Junior Mini-parejas', 'Mini-Solistas Junior']
         ]
     },
     {
@@ -86,9 +82,7 @@ export const sessions: Session[] = [
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [
-            ['Juvenil'],
-            ['Juvenil Parejas'],
-            ['Solistas Juvenil']
+            ['Juvenil', 'Juvenil Parejas']
         ]
     },
     {
@@ -98,10 +92,7 @@ export const sessions: Session[] = [
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [
-            ['Absoluta'],
-            ['Parejas'],
-            ['Solistas Absoluta'],
-            ['Premium']
+            ['Absoluta', 'Parejas', 'Solistas Absoluta', 'Premium']
         ]
     }
 ];
