@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { fetchGroupsForVoting, fetchJudgesCriteriaConfig, submitScore, fetchScoresForGroup } from "@/app/actions-judges";
+import { fetchGroupsForVoting, fetchJudgesCriteriaConfig, submitScore, fetchScoresForGroup, fetchCategoryStatus, fetchJudgeCompletedScores } from "@/app/actions-judges";
 import { ArrowLeft, Star, Check, User, Trophy, Save, AlertCircle, ChevronRight } from "lucide-react";
 
 // Component wrapper for Suspense
@@ -22,6 +22,8 @@ function VotingInterface() {
     const [scores, setScores] = useState<Record<string, number>>({});
     const [submitting, setSubmitting] = useState(false);
     const [alreadyVoted, setAlreadyVoted] = useState(false);
+    const [completedGroupIds, setCompletedGroupIds] = useState<string[]>([]);
+    const [isCategoryClosed, setIsCategoryClosed] = useState(false);
 
     useEffect(() => {
         // Auth check
@@ -74,12 +76,24 @@ function VotingInterface() {
                 criteria.sort((a: string, b: string) => {
                     const indexA = ORDERED_CRITERIA.indexOf(a);
                     const indexB = ORDERED_CRITERIA.indexOf(b);
-                    // If not found (shouldn't happen), put at end
                     return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
                 });
 
                 setActiveCriteria(criteria);
             }
+
+            // 3. Fetch Category Status
+            const statusRes = await fetchCategoryStatus(category!);
+            if (statusRes.success) {
+                setIsCategoryClosed(statusRes.is_closed);
+            }
+
+            // 4. Fetch Completed Scores
+            const compRes = await fetchJudgeCompletedScores(judgeId, category!);
+            if (compRes.success) {
+                setCompletedGroupIds(compRes.data);
+            }
+
         } catch (error) {
             console.error(error);
         } finally {
@@ -129,6 +143,7 @@ function VotingInterface() {
 
     const handleScoreChange = (criteria: string, value: number) => {
         setScores(prev => {
+            if (isCategoryClosed) return prev; // Bloquear si está cerrada
             const currentVal = prev[criteria];
             const newScores = { ...prev };
 
@@ -173,7 +188,10 @@ function VotingInterface() {
             // Clear draft on success
             localStorage.removeItem(`dina_draft_${judgeInfo.id}_${selectedGroup.id}`);
 
-            // alert("¡Puntuación guardada!"); // Removed alert to streamline flow
+            // Mark as completed in local state
+            if (!completedGroupIds.includes(selectedGroup.id)) {
+                setCompletedGroupIds([...completedGroupIds, selectedGroup.id]);
+            }
 
             // Auto-advance logic
             const currentIndex = groups.findIndex(g => g.id === selectedGroup.id);
@@ -247,9 +265,14 @@ function VotingInterface() {
                         <p className="text-zinc-400 font-medium relative z-10 flex items-center gap-2">
                             <User size={16} /> {selectedGroup.school_name}
                         </p>
-                        {alreadyVoted && (
+                        {alreadyVoted && !isCategoryClosed && (
                             <div className="mt-4 bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
                                 <Check size={16} /> Puntuación guardada (Editando)
+                            </div>
+                        )}
+                        {isCategoryClosed && (
+                            <div className="mt-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                                <AlertCircle size={16} /> La categoría está cerrada. Solo lectura.
                             </div>
                         )}
                     </div>
@@ -279,7 +302,7 @@ function VotingInterface() {
                                                 className={`aspect-square rounded-2xl font-black text-lg transition-all flex items-center justify-center relative overflow-hidden ${scores[criteria] === num
                                                     ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/40 ring-2 ring-pink-400 ring-offset-2 ring-offset-zinc-900 scale-[1.02] z-10'
                                                     : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 active:bg-zinc-600'
-                                                    }`}
+                                                    } ${isCategoryClosed ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                                             >
                                                 {num}
                                             </button>
@@ -304,10 +327,10 @@ function VotingInterface() {
 
                         <button
                             onClick={handleSubmit}
-                            disabled={submitting}
+                            disabled={submitting || isCategoryClosed}
                             className="flex-1 bg-white text-black hover:bg-zinc-200 font-black py-4 rounded-2xl shadow-xl shadow-white/10 text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                         >
-                            {submitting ? <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-black"></div> : <><Save size={20} /> GUARDAR</>}
+                            {submitting ? <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-black"></div> : <><Save size={20} /> {isCategoryClosed ? 'CERRADA' : 'GUARDAR'}</>}
                         </button>
 
                         <button
@@ -375,6 +398,15 @@ function VotingInterface() {
                                                 </div>
                                             </div>
                                         </div>
+                                        {completedGroupIds.includes(group.id) ? (
+                                            <div className="absolute top-0 right-0 p-2 text-green-500 bg-green-500/10 rounded-bl-xl font-bold text-xs flex items-center gap-1">
+                                                <Check size={12}/> Puntuado
+                                            </div>
+                                        ) : (
+                                            <div className="absolute top-0 right-0 p-2 text-yellow-500 bg-yellow-500/10 rounded-bl-xl font-bold text-xs flex items-center gap-1">
+                                                <AlertCircle size={12}/> Pendiente
+                                            </div>
+                                        )}
                                         <div className="h-12 w-12 flex items-center justify-center rounded-full bg-zinc-950 text-zinc-600 group-hover:bg-pink-600 group-hover:text-white transition-colors shadow-sm">
                                             <ChevronRight size={24} />
                                         </div>

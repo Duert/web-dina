@@ -54,28 +54,27 @@ export function EventInfoModal({ isOpen, onClose }: EventInfoModalProps) {
                         <div className="space-y-4">
                             <h3 className="text-pink-400 font-black text-sm tracking-wider uppercase border-b border-pink-500/20 pb-2">Mañana</h3>
 
-                            {/* Bloque 1 - 09:30h */}
+                            {/* Bloque 1 - 09:00h */}
                             <div className="pl-2 border-l-2 border-white/10 ml-1">
                                 <div className="flex justify-between items-baseline">
                                     <h4 className="text-white font-bold text-sm">Bloque 1</h4>
-                                    <span className="text-xs text-pink-300 font-mono">09:30h - 11:00h</span>
+                                    <span className="text-xs text-pink-300 font-mono">09:00h - 10:15h</span>
                                 </div>
                                 <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
                                     <li>• Infantil</li>
-                                    <li>• Mini-Parejas Infantil</li>
-                                    <li>• Mini-Solistas Infantil</li>
+                                    <li>• Infantil Mini-parejas</li>
                                 </ul>
                             </div>
 
-                            {/* Bloque 2 - 11:30h */}
+                            {/* Bloque 2 - 10:45h */}
                             <div className="pl-2 border-l-2 border-white/10 ml-1">
                                 <div className="flex justify-between items-baseline">
                                     <h4 className="text-white font-bold text-sm">Bloque 2</h4>
-                                    <span className="text-xs text-pink-300 font-mono">11:30h - 13:00h</span>
+                                    <span className="text-xs text-pink-300 font-mono">10:45h - 12:45h</span>
                                 </div>
                                 <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
                                     <li>• Junior</li>
-                                    <li>• Mini-Parejas Junior</li>
+                                    <li>• Junior Mini-parejas</li>
                                     <li>• Mini-Solistas Junior</li>
                                 </ul>
                             </div>
@@ -85,28 +84,27 @@ export function EventInfoModal({ isOpen, onClose }: EventInfoModalProps) {
                         <div className="space-y-4">
                             <h3 className="text-indigo-400 font-black text-sm tracking-wider uppercase border-b border-indigo-500/20 pb-2">Tarde</h3>
 
-                            {/* Bloque 1 - 15:00h */}
+                            {/* Bloque 3 - 15:00h */}
                             <div className="pl-2 border-l-2 border-white/10 ml-1">
                                 <div className="flex justify-between items-baseline">
                                     <h4 className="text-white font-bold text-sm">Bloque 3</h4>
-                                    <span className="text-xs text-indigo-300 font-mono">15:00h - 16:30h</span>
+                                    <span className="text-xs text-indigo-300 font-mono">15:00h - 16:15h</span>
                                 </div>
                                 <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
                                     <li>• Juvenil</li>
-                                    <li>• Parejas Juvenil</li>
-                                    <li>• Solistas Juvenil</li>
+                                    <li>• Juvenil Parejas</li>
                                 </ul>
                             </div>
 
-                            {/* Bloque 2 - 17:00h */}
+                            {/* Bloque 4 - 16:45h */}
                             <div className="pl-2 border-l-2 border-white/10 ml-1">
                                 <div className="flex justify-between items-baseline">
                                     <h4 className="text-white font-bold text-sm">Bloque 4</h4>
-                                    <span className="text-xs text-indigo-300 font-mono">17:00h - 18:30h</span>
+                                    <span className="text-xs text-indigo-300 font-mono">16:45h - 18:30h</span>
                                 </div>
                                 <ul className="text-xs text-gray-400 mt-1 space-y-0.5">
                                     <li>• Absoluta</li>
-                                    <li>• Parejas Absoluta</li>
+                                    <li>• Parejas</li>
                                     <li>• Solistas Absoluta</li>
                                     <li>• Premium</li>
                                 </ul>

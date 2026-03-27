@@ -2,6 +2,7 @@
 
 import { createClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
+import { sessions } from "@/lib/data"
 
 export async function resetApplicationData() {
     console.log("Starting data reset...");
@@ -408,6 +409,22 @@ export async function toggleGroupRegistrationAction(enabled: boolean) {
             .eq('id', 1);
 
         if (error) throw error;
+
+        // Limpiar borradores automáticamente si se cierran las inscripciones
+        if (!enabled) {
+            console.log("Cerrando inscripciones, eliminando todos los borradores...");
+            const { error: deleteError } = await supabaseAdmin
+                .from('registrations')
+                .delete()
+                .eq('status', 'draft');
+
+            if (deleteError) {
+                console.error("Error al eliminar borradores:", deleteError);
+                // Si falla la eliminación no queremos revertir el toggle, 
+                // pero lo registramos por seguridad.
+            }
+        }
+
         revalidatePath('/admin');
         revalidatePath('/dashboard');
         revalidatePath('/registration');
@@ -527,39 +544,72 @@ export async function getSchoolsStatsAction() {
     });
 
     try {
-        // 1. Fetch all profiles
-        const { data: profiles, error: profError } = await supabaseAdmin
-            .from('profiles')
-            .select('*')
-            .order('school_name', { ascending: true });
+        // 1. Fetch all profiles with pagination
+        let allProfiles: any[] = [];
+        let pPage = 0;
+        const pageSize = 1000;
+        let pHasMore = true;
+        while (pHasMore) {
+            const { data, error } = await supabaseAdmin
+                .from('profiles')
+                .select('*')
+                .order('school_name', { ascending: true })
+                .range(pPage * pageSize, (pPage + 1) * pageSize - 1);
+            if (error) throw error;
+            if (data && data.length > 0) {
+                allProfiles = [...allProfiles, ...data];
+                if (data.length < pageSize) pHasMore = false;
+            } else { pHasMore = false; }
+            pPage++;
+        }
+        const profiles = allProfiles;
 
-        if (profError) throw profError;
+        // 2. Fetch all registrations with pagination
+        let allRegs: any[] = [];
+        let rPage = 0;
+        let rHasMore = true;
+        while (rHasMore) {
+            const { data, error } = await supabaseAdmin
+                .from('registrations')
+                .select(`
+                    id, 
+                    user_id,
+                    category,
+                    status,
+                    registration_participants(name, surnames, num_tickets),
+                    registration_responsibles(name, surnames)
+                `)
+                .range(rPage * pageSize, (rPage + 1) * pageSize - 1);
+            if (error) throw error;
+            if (data && data.length > 0) {
+                allRegs = [...allRegs, ...data];
+                if (data.length < pageSize) rHasMore = false;
+            } else { rHasMore = false; }
+            rPage++;
+        }
+        const registrations = allRegs;
 
-        // 2. Fetch all registrations with their inner data to calculate unique participants and responsibles
-        const { data: registrations, error: regError } = await supabaseAdmin
-            .from('registrations')
-            .select(`
-                id, 
-                user_id,
-                category,
-                status,
-                registration_participants(name, surnames),
-                registration_responsibles(name, surnames)
-            `);
-
-        if (regError) throw regError;
-
-        // 3. Fetch all participants for total counts (can be optimized but keeping existing logic)
-        const { data: participants, error: partError } = await supabaseAdmin
-            .from('registration_participants')
-            .select('registration_id');
-
-        if (partError) throw partError;
+        // 3. Fetch all participants for total counts
+        let allParts: any[] = [];
+        let ptPage = 0;
+        let ptHasMore = true;
+        while (ptHasMore) {
+            const { data, error } = await supabaseAdmin
+                .from('registration_participants')
+                .select('registration_id')
+                .range(ptPage * pageSize, (ptPage + 1) * pageSize - 1);
+            if (error) throw error;
+            if (data && data.length > 0) {
+                allParts = [...allParts, ...data];
+                if (data.length < pageSize) ptHasMore = false;
+            } else { ptHasMore = false; }
+            ptPage++;
+        }
+        const participants = allParts;
 
         // 4. Fetch all tickets using pagination
         let allTickets: any[] = [];
-        let page = 0;
-        const pageSize = 1000;
+        let tPage = 0;
         let hasMore = true;
 
         while (hasMore) {
@@ -567,7 +617,7 @@ export async function getSchoolsStatsAction() {
                 .from('tickets')
                 .select('registration_id, session_id')
                 .eq('status', 'sold')
-                .range(page * pageSize, (page + 1) * pageSize - 1);
+                .range(tPage * pageSize, (tPage + 1) * pageSize - 1);
 
             if (ticketError) throw ticketError;
 
@@ -577,23 +627,15 @@ export async function getSchoolsStatsAction() {
             } else {
                 hasMore = false;
             }
-            page++;
+            tPage++;
         }
 
         const tickets = allTickets;
 
         // Process data
         const getCategoryBlock = (category: string) => {
-            const block1 = ['Infantil', 'Infantil Mini-parejas', 'Mini-Solistas Infantil'];
-            const block2 = ['Junior', 'Junior Mini-parejas', 'Mini-Solistas Junior'];
-            const block3 = ['Juvenil', 'Juvenil Parejas', 'Solistas Juvenil'];
-            const block4 = ['Absoluta', 'Parejas', 'Solistas Absoluta', 'Premium'];
-
-            if (block1.includes(category)) return 'block1';
-            if (block2.includes(category)) return 'block2';
-            if (block3.includes(category)) return 'block3';
-            if (block4.includes(category)) return 'block4';
-            return null;
+            const sess = sessions.find(s => s.categoryRows.flat().includes(category));
+            return sess ? sess.id : null;
         };
 
         const stats = profiles.map(profile => {
@@ -636,24 +678,25 @@ export async function getSchoolsStatsAction() {
                 block4: uniqueResponsiblesByBlock.block4.size,
             };
 
-            const schoolParts = participants.filter(p => regIds.includes(p.registration_id)).length;
-            const schoolTickets = tickets.filter(t => t.registration_id && regIds.includes(t.registration_id));
+            const logicalTicketsByBlock = { block1: 0, block2: 0, block3: 0, block4: 0 };
+            validRegs.forEach((reg) => {
+                const blockId = getCategoryBlock(reg.category);
+                if (blockId && logicalTicketsByBlock.hasOwnProperty(blockId)) {
+                    const companionTickets = (reg.registration_participants || []).reduce((s: number, p: any) => s + (p.num_tickets || 0), 0);
+                    logicalTicketsByBlock[blockId as keyof typeof logicalTicketsByBlock] += companionTickets;
+                }
+            });
 
-            const ticketsByBlock = {
-                block1: schoolTickets.filter(t => t.session_id === 'block1').length,
-                block2: schoolTickets.filter(t => t.session_id === 'block2').length,
-                block3: schoolTickets.filter(t => t.session_id === 'block3').length,
-                block4: schoolTickets.filter(t => t.session_id === 'block4').length,
-            };
+            const schoolParts = participants.filter(p => regIds.includes(p.registration_id)).length;
 
             return {
                 ...profile,
                 groups_count: schoolRegs.length,
                 participants_count: schoolParts,
-                tickets_by_block: ticketsByBlock,
+                tickets_by_block: logicalTicketsByBlock,
                 unique_participants_by_block: uniqueParticipantsByBlockObj,
                 unique_responsibles_by_block: uniqueResponsiblesByBlockObj,
-                total_tickets: schoolTickets.length
+                total_tickets: Object.values(logicalTicketsByBlock).reduce((a, b) => a + b, 0)
             };
         });
 

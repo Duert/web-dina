@@ -36,6 +36,18 @@ interface RegistrationWithDetails extends Registration {
     tickets?: { count: number }[];
 }
 
+import { sessions } from "@/lib/data";
+
+// Helper function to find standard block for a category
+const getBlockForCategory = (category: string) => {
+    for (const session of sessions) {
+        if (session.categoryRows && session.categoryRows.flat().includes(category)) {
+            return session.name;
+        }
+    }
+    return 'Bloque Desconocido';
+};
+
 export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
@@ -45,6 +57,7 @@ export default function DashboardPage() {
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false); // Make sure this exists
     const [groupRegistrationEnabled, setGroupRegistrationEnabled] = useState(false);
+    const [isOrderPublished, setIsOrderPublished] = useState(false);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -52,6 +65,7 @@ export default function DashboardPage() {
                 const res = await getAppSettingsAction();
                 if (res.success && res.data) {
                     setGroupRegistrationEnabled(res.data.group_registration_enabled);
+                    setIsOrderPublished(res.data.is_order_published);
                 }
             } catch (err) {
                 console.error("Error fetching settings:", err);
@@ -272,12 +286,9 @@ export default function DashboardPage() {
                             <Plus size={20} /> Nueva Inscripción
                         </Link>
                     ) : (
-                        <button
-                            disabled
-                            className="bg-gray-700 text-gray-400 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 cursor-not-allowed opacity-50"
-                        >
-                            <Plus size={20} /> Próximamente
-                        </button>
+                        <div className="bg-red-500/10 text-red-500 border border-red-500/20 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 whitespace-nowrap cursor-not-allowed">
+                            Plazo de inscripciones cerrado
+                        </div>
                     )}
                 </div>
 
@@ -296,12 +307,9 @@ export default function DashboardPage() {
                                 Comenzar Inscripción
                             </Link>
                         ) : (
-                            <button
-                                disabled
-                                className="inline-flex items-center gap-2 bg-gray-700 text-gray-400 px-8 py-4 rounded-2xl font-bold cursor-not-allowed opacity-50"
-                            >
-                                Próximamente (8 de Febrero)
-                            </button>
+                            <div className="inline-flex items-center gap-2 bg-red-500/10 text-red-500 border border-red-500/20 px-8 py-4 rounded-2xl font-bold cursor-not-allowed">
+                                Se ha cerrado el plazo de inscripciones
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -309,8 +317,7 @@ export default function DashboardPage() {
                         {registrations.map((reg) => (
                             <div
                                 key={reg.id}
-                                className="group bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer relative overflow-hidden"
-                                onClick={() => router.push(`/registration?id=${reg.id}`)}
+                                className="group bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden"
                             >
                                 <div className="flex items-start gap-4 flex-1">
                                     <div className={`mt-1 p-3 rounded-2xl border ${reg.status === 'submitted' ? 'bg-green-500/10 border-green-500/20 text-green-500' : reg.status === 'submitted_modifiable' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500'}`}>
@@ -336,6 +343,21 @@ export default function DashboardPage() {
                                                     <span className="text-[10px] text-gray-600 line-through">({reg.original_category})</span>
                                                 )}
                                             </div>
+                                            {isOrderPublished && reg.order_index && (
+                                                <div className="flex items-center gap-2 mt-3 px-3 py-2 bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-black uppercase text-[var(--primary)] tracking-widest">Actuación</span>
+                                                        <span className="text-sm font-bold text-white">
+                                                            {getBlockForCategory(reg.category)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-px h-8 bg-[var(--primary)]/30 mx-2"></div>
+                                                    <div className="flex flex-col items-center justify-center bg-[var(--primary)] text-white w-10 h-10 rounded-lg shadow-lg shadow-pink-500/20">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest leading-none">Orden</span>
+                                                        <span className="text-lg font-black leading-none">#{reg.order_index}</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
                                                 <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Actualizado</span>
                                                 <span className="text-xs font-bold text-gray-400">{new Date(reg.updated_at || reg.created_at!).toLocaleDateString()}</span>
@@ -374,25 +396,7 @@ export default function DashboardPage() {
                                                 }
                                             </div>
 
-                                            {/* Music Re-upload Button */}
-                                            {reg.music_status === 'error' && (
-                                                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                                                    <label className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer bg-red-600 text-white border-red-500 hover:bg-red-700 shadow-[0_0_15px_rgba(220,38,38,0.4)] ${isUploadingMusic === reg.id ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                                        {isUploadingMusic === reg.id ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                                                        {isUploadingMusic === reg.id ? 'Subiendo...' : 'Actualizar Música'}
-                                                        <input
-                                                            type="file"
-                                                            accept="audio/mpeg,audio/mp3"
-                                                            className="hidden"
-                                                            disabled={isUploadingMusic === reg.id}
-                                                            onChange={(e) => {
-                                                                const file = e.target.files?.[0];
-                                                                if (file) handleMusicReupload(reg.id!, file);
-                                                            }}
-                                                        />
-                                                    </label>
-                                                </div>
-                                            )}
+                                            {/* Music Re-upload Button Removed */}
 
                                             {/* 4. Entradas */}
                                             <div className="flex items-center gap-2 mt-4 text-xs font-medium text-white/50 pt-3 border-t border-white/5">
@@ -410,32 +414,12 @@ export default function DashboardPage() {
                                         <div className={`text-[11px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full inline-block mb-1 shadow-sm ${reg.status === 'submitted' ? 'bg-green-500 text-white' : reg.status === 'submitted_modifiable' ? 'bg-orange-500 text-white animate-pulse' : 'bg-yellow-500 text-black'}`}>
                                             {reg.status === 'submitted' ? 'ENVIADO' : reg.status === 'submitted_modifiable' ? 'REQUIERE REVISIÓN' : 'BORRADOR'}
                                         </div>
-                                        <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mt-1 opacity-60">
-                                            Click para {reg.status === 'submitted' ? 'ver' : 'editar'}
+                                        <p className="text-var(--primary) text-[10px] uppercase font-black tracking-widest mt-1 opacity-90 border border-var(--primary)/30 bg-var(--primary)/10 px-2 py-1 rounded-md inline-block">
+                                            INSCRIPCIÓN CERRADA CORRECTAMENTE
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                if (confirm("¿Estás seguro de que quieres BORRAR este borrador? No se puede deshacer.")) {
-                                                    const res = await deleteRegistrationAction(reg.id!);
-                                                    if (res.success) {
-                                                        alert("Borrador eliminado.");
-                                                        fetchRegistrations(user.id);
-                                                    } else {
-                                                        alert("Error: " + res.message);
-                                                    }
-                                                }
-                                            }}
-                                            className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-gray-600 z-10"
-                                            title="Borrar Borrador"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                        <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-[var(--primary)] group-hover:text-white transition-all text-gray-600">
-                                            <ChevronRight size={20} />
-                                        </div>
+                                        {/* Remove draft deletion and chevron so it is completely locked */}
                                     </div>
                                 </div>
                             </div>

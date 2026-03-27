@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Lock, ChevronRight, Loader2, UserCircle } from "lucide-react";
-import { fetchJudgePool } from "@/app/actions-judges";
+import { fetchJudgePool, fetchJudgesGlobalConfig } from "@/app/actions-judges";
 
 export default function JudgesLoginPage() {
     const router = useRouter();
@@ -12,19 +12,27 @@ export default function JudgesLoginPage() {
     const [pin, setPin] = useState("");
     const [error, setError] = useState("");
 
-    // Pool
+    // Pool & Config
     const [judgePool, setJudgePool] = useState<string[]>([]);
+    const [judgesCount, setJudgesCount] = useState<number>(4);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const loadPool = async () => {
-            const res = await fetchJudgePool();
-            if (res.success && res.data) {
-                setJudgePool(res.data);
+        const loadData = async () => {
+            const [poolRes, configRes] = await Promise.all([
+                fetchJudgePool(),
+                fetchJudgesGlobalConfig()
+            ]);
+            
+            if (poolRes.success && poolRes.data) {
+                setJudgePool(poolRes.data);
+            }
+            if (configRes.success && configRes.data) {
+                setJudgesCount(configRes.data.count);
             }
             setLoading(false);
         };
-        loadPool();
+        loadData();
     }, []);
 
     const handleLogin = (e: React.FormEvent) => {
@@ -74,8 +82,8 @@ export default function JudgesLoginPage() {
                     {/* Judge Selection Grid */}
                     <div className="space-y-4">
                         <label className="block text-center text-xs font-bold text-zinc-500 uppercase">1. ¿Qué número de Juez eres?</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {[1, 2, 3, 4].map((num) => {
+                        <div className="flex justify-center gap-3">
+                            {Array.from({ length: judgesCount }, (_, i) => i + 1).map((num) => {
                                 const isSelected = judgeId === num;
 
                                 return (
@@ -83,16 +91,16 @@ export default function JudgesLoginPage() {
                                         key={num}
                                         type="button"
                                         onClick={() => setJudgeId(num)}
-                                        className={`p-4 rounded-xl border-2 font-bold transition-all flex flex-col items-center gap-2 ${isSelected
-                                            ? 'border-pink-500 bg-pink-500/20 text-white'
-                                            : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-white'
+                                        className={`flex-1 p-4 rounded-xl border-2 font-bold transition-all flex flex-col items-center gap-2 ${isSelected
+                                            ? 'border-pink-500 bg-pink-500/20 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)] scale-105'
+                                            : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-white hover:bg-zinc-900'
                                             }`}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black ${isSelected ? 'bg-pink-500 text-white' : 'bg-zinc-800 text-zinc-600'
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-black transition-colors ${isSelected ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/50' : 'bg-zinc-800 text-zinc-500'
                                             }`}>
                                             {num}
                                         </div>
-                                        <span className="text-sm">JUEZ {num}</span>
+                                        <span className="text-xs tracking-widest whitespace-nowrap">JUEZ {num}</span>
                                     </button>
                                 )
                             })}

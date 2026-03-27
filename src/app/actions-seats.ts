@@ -79,7 +79,8 @@ export async function manualAssignSeatAction(
     sessionId: string,
     seatId: string,
     assignedTo: string,
-    isFree: boolean
+    isFree: boolean,
+    registrationId?: string | null
 ) {
     try {
         const price = isFree ? 0 : 3.0;
@@ -93,7 +94,7 @@ export async function manualAssignSeatAction(
                 assigned_to: assignedTo,
                 is_free: isFree,
                 price: price,
-                registration_id: null, // Manual assignments don't have registration
+                registration_id: registrationId || null, // Allow linking to a registration
                 sold_at: new Date().toISOString()
             }, {
                 onConflict: 'session_id,seat_id'

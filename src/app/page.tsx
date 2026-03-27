@@ -19,6 +19,7 @@ export default function Home() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState("");
   const [rankingsVisible, setRankingsVisible] = useState(false);
+  const [isOrderPublished, setIsOrderPublished] = useState(false);
 
   useEffect(() => {
     // Countdown Logic
@@ -51,12 +52,13 @@ export default function Home() {
       // We assume settings are in table 'app_settings', row id=1
       const { data } = await supabase
         .from('app_settings')
-        .select('public_rankings_visible')
+        .select('public_rankings_visible, is_order_published')
         .eq('id', 1)
         .single();
 
       if (data) {
         setRankingsVisible(data.public_rankings_visible);
+        setIsOrderPublished(data.is_order_published);
       }
     };
     fetchSettings();
@@ -187,7 +189,20 @@ export default function Home() {
               </Link>
             )}
 
-            <h3 className="text-white font-bold text-sm tracking-wider opacity-70 mb-1">DESCARGAS</h3>
+            {isOrderPublished && (
+              <Link
+                href="/escaletas"
+                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 border border-fuchsia-400/30 p-4 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(200,0,255,0.2)] mb-2 animate-in slide-in-from-right-4 fade-in duration-500"
+              >
+                <FileText className="w-8 h-8 text-white group-hover:-rotate-12 transition-transform" />
+                <div className="text-left w-full pl-2">
+                  <h3 className="font-black text-white text-xl leading-none">ESCALETAS</h3>
+                  <p className="text-fuchsia-100 text-xs font-bold">Orden de Actuación</p>
+                </div>
+              </Link>
+            )}
+
+            <h3 className="text-white font-bold text-sm tracking-wider opacity-70 mb-1 mt-2">DESCARGAS</h3>
 
             <a
               href="/docs/bases_2026.pdf?v=2"
@@ -255,11 +270,11 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-black/30 p-3 rounded-lg border border-white/5">
                   <p className="text-gray-400 text-xs uppercase tracking-wider">Recaudado 2025</p>
-                  <p className="text-2xl font-black text-[var(--primary)]">7.697€</p>
+                  <p className="text-2xl font-black text-[var(--primary)]">7.797€</p>
                 </div>
                 <div className="bg-black/30 p-3 rounded-lg border border-white/5">
                   <p className="text-gray-400 text-xs uppercase tracking-wider">Total (10 años)</p>
-                  <p className="text-2xl font-black text-white">48.429€</p>
+                  <p className="text-2xl font-black text-white">48.529€</p>
                 </div>
               </div>
             </div>

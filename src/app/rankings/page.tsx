@@ -227,6 +227,11 @@ export default function RankingsPage() {
                                             {item.total}
                                         </div>
                                         <div className="text-[10px] uppercase font-bold text-slate-500 text-right">Puntos</div>
+                                        {item.penalty > 0 && (
+                                            <div className="text-[10px] uppercase font-bold text-red-400 text-right mt-1">
+                                                -{item.penalty} Pen.
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Decorative Trophy for 1st place */}

@@ -26,13 +26,33 @@ export default function ManualAssignPage({ params }: { params: Promise<{ session
     // Form state
     const [assignedTo, setAssignedTo] = useState("");
     const [isFree, setIsFree] = useState(false);
+    const [selectedRegistrationId, setSelectedRegistrationId] = useState<string>("");
+    const [registrations, setRegistrations] = useState<{ id: string, group_name: string, school_name: string }[]>([]);
 
     const sessionId = resolvedParams.sessionId;
     const sessionName = SESSION_NAMES[sessionId] || sessionId;
 
     useEffect(() => {
         loadSeats();
+        loadRegistrations();
     }, [sessionId]);
+
+    const loadRegistrations = async () => {
+        try {
+            const { data } = await supabase
+                .from('registrations')
+                .select('id, group_name, school_name')
+                .neq('status', 'draft')
+                .order('school_name', { ascending: true })
+                .order('group_name', { ascending: true });
+            
+            if (data) {
+                setRegistrations(data);
+            }
+        } catch (error) {
+            console.error('Error loading registrations:', error);
+        }
+    };
 
     const loadSeats = async () => {
         setLoading(true);
@@ -139,12 +159,19 @@ export default function ManualAssignPage({ params }: { params: Promise<{ session
 
         setSaving(true);
         for (const seat of assignableSeats) {
-            await manualAssignSeatAction(sessionId, seat.id, assignedTo.trim(), isFree);
+            await manualAssignSeatAction(
+                sessionId, 
+                seat.id, 
+                assignedTo.trim(), 
+                isFree, 
+                selectedRegistrationId || null
+            );
         }
         setSaving(false);
 
         setSelectedSeats([]);
         setAssignedTo("");
+        setSelectedRegistrationId("");
         setIsFree(false);
         loadSeats();
         alert(`${assignableSeats.length} butaca(s) asignadas correctamente`);
@@ -264,6 +291,33 @@ export default function ManualAssignPage({ params }: { params: Promise<{ session
                                 Asignar Manualmente
                             </h3>
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                                        Vincular a Grupo/Escuela (Opcional)
+                                    </label>
+                                    <select
+                                        value={selectedRegistrationId}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSelectedRegistrationId(val);
+                                            if (val) {
+                                                const reg = registrations.find(r => r.id === val);
+                                                if (reg) {
+                                                    setAssignedTo(`${reg.school_name || 'Sin Escuela'} - ${reg.group_name}`);
+                                                }
+                                            }
+                                        }}
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2 text-slate-900 focus:outline-none focus:border-[var(--primary)] transition-colors mb-4"
+                                    >
+                                        <option value="">-- No vincular a un grupo específico --</option>
+                                        {registrations.map(reg => (
+                                            <option key={reg.id} value={reg.id}>
+                                                {reg.school_name || 'Sin Escuela'} - {reg.group_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">
                                         Asignado a *

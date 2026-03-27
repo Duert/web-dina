@@ -16,7 +16,8 @@ import {
     Loader2,
     CheckCircle2,
     Music,
-    MessageSquare
+    MessageSquare,
+    AlertTriangle
 } from "lucide-react";
 import { DanceCategory, Registration, RegistrationResponsible, RegistrationParticipant } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -120,26 +121,7 @@ function RegistrationForm() {
         checkAuth();
     }, [registrationIdParam, router]);
 
-    if (!checkingStatus && !registrationEnabled) {
-        return (
-            <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                    <Loader2 className="w-10 h-10 text-[var(--primary)]" />
-                </div>
-                <h1 className="text-3xl md:text-5xl font-black mb-4 tracking-tighter uppercase">
-                    Inscripciones <br />
-                    <span className="text-[var(--primary)]">Próximamente</span>
-                </h1>
-                <p className="text-xl text-gray-400 max-w-lg mb-8">
-                    Las inscripciones se abrirán el <strong>8 de Febrero</strong>.
-                    <br />Mientras tanto, puedes completar tu perfil de usuario.
-                </p>
-                <Link href="/dashboard" className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition-all">
-                    Volver al Dashboard
-                </Link>
-            </div>
-        );
-    }
+
 
     const loadRegistration = async (id: string | null) => {
         if (!id) return;
@@ -205,15 +187,6 @@ function RegistrationForm() {
     // --- Helpers ---
 
     const handleCategoryChange = (newCategory: DanceCategory) => {
-        const closedCategories = [
-            "Infantil", "Infantil Mini-parejas", "Mini-Solistas Infantil",
-            "Junior", "Junior Mini-parejas", "Mini-Solistas Junior",
-            "Absoluta", "Parejas", "Solistas Absoluta"
-        ];
-        if (closedCategories.includes(newCategory) && initialCategory !== newCategory) {
-            alert("Hemos cerrado las inscripciones de las categorias del Bloque 1, Bloque 2 y Bloque 4 (excepto Premium). Hemos llenado el cupo de grupos. Disculpar por las molestias.");
-            return;
-        }
         setCategory(newCategory);
     };
 
@@ -503,16 +476,6 @@ function RegistrationForm() {
             if (result.details?.suggestedCategory) {
                 const nextCategory = result.details.suggestedCategory;
 
-                const closedCategories = [
-                    "Infantil", "Infantil Mini-parejas", "Mini-Solistas Infantil",
-                    "Junior", "Junior Mini-parejas", "Mini-Solistas Junior",
-                    "Absoluta", "Parejas", "Solistas Absoluta"
-                ];
-                if (closedCategories.includes(nextCategory as any) && initialCategory !== nextCategory) {
-                    setError(`No se puede reasignar automáticamente a la categoría superior (${nextCategory}) porque hemos cerrado las inscripciones de estas categorías. El cupo de grupos del Bloque 1, Bloque 2 y Bloque 4 (excepto Premium) está lleno. Revisa las fechas de nacimiento.`);
-                    return false;
-                }
-
                 setCategory(nextCategory);
 
                 // Format invalid participants list for the message
@@ -584,20 +547,16 @@ function RegistrationForm() {
 
         // 4. Global Registration Deadline Check
         // Cierre general a las 00:00 del 2 de Marzo, hora de España (CET: UTC+1)
-        const now = new Date();
-        const cutoffDate = new Date('2026-03-02T00:00:00+01:00');
+        // Since we are now using the Quota System actively, we should ALWAYS check quotas
+        // if they are set, but for now we'll rely on the Quota system rejecting if 0.
 
-        if (now >= cutoffDate) {
-            // It is past the deadline. Check for explicitly opened quotas.
-            const quotaRes = await consumeQuotaAction(category);
+        const quotaRes = await consumeQuotaAction(category);
 
-            if (!quotaRes.success || !quotaRes.allowed) {
-                setSubmitting(false);
-                setError("El plazo general de inscripción ha terminado. No hay plazas extraordinarias abiertas actualmente para la categoría " + category + ".");
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                return;
-            }
-            // If quotaRes.allowed is true, the quota was successfully consumed, so we let the submit proceed.
+        if (!quotaRes.success || !quotaRes.allowed) {
+            setSubmitting(false);
+            setError("No hay plazas disponibles actualmente para la categoría " + category + ".");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
         }
 
         await saveToDB('submitted');
@@ -719,10 +678,28 @@ function RegistrationForm() {
         );
     };
 
-    if (loading) {
+    if (loading || checkingStatus) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center">
                 <Loader2 className="text-[var(--primary)] animate-spin" size={40} />
+            </div>
+        );
+    }
+
+    // BLOCK REGISTRATION ACCESS IF CLOSED
+    if (!registrationEnabled && (!registrationId || status === 'draft')) {
+        return (
+            <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center">
+                <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 animate-in zoom-in">
+                    <AlertTriangle className="w-10 h-10 text-red-500" />
+                </div>
+                <h1 className="text-4xl font-bold mb-4 tracking-tighter uppercase">Inscripciones Cerradas</h1>
+                <p className="text-xl text-gray-400 max-w-lg mb-8">
+                    El plazo de inscripción de nuevos grupos ha finalizado. Sólo puedes acceder a grupos ya enviados o verificados.
+                </p>
+                <Link href="/dashboard" className="bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition-colors">
+                    Volver a mi Panel
+                </Link>
             </div>
         );
     }
@@ -803,7 +780,6 @@ function RegistrationForm() {
                                         <optgroup label="Mañana Bloque 1">
                                             <option value="Infantil">Infantil (nacidos 2014 y posterior)</option>
                                             <option value="Infantil Mini-parejas">Infantil Mini-parejas (nacidos 2014 y posterior)</option>
-                                            <option value="Mini-Solistas Infantil">Mini-Solistas Infantil (nacidos 2014 y posterior)</option>
                                         </optgroup>
                                         <optgroup label="Mañana Bloque 2">
                                             <option value="Junior">Junior (nacidos 2011-2013)</option>
@@ -813,7 +789,6 @@ function RegistrationForm() {
                                         <optgroup label="Tarde Bloque 3">
                                             <option value="Juvenil">Juvenil (nacidos 2009-2010)</option>
                                             <option value="Juvenil Parejas">Juvenil Parejas (nacidos 2009-2010)</option>
-                                            <option value="Solistas Juvenil">Solistas Juvenil (nacidos 2009-2010)</option>
                                         </optgroup>
                                         <optgroup label="Tarde Bloque 4">
                                             <option value="Absoluta">Absoluta (nacidos 2008 y anterior)</option>
@@ -1268,12 +1243,36 @@ function RegistrationForm() {
                     </section>
 
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500 text-red-500 p-4 rounded-xl text-center animate-in shake font-bold">
+                        <div className="bg-red-500/10 border border-red-500 text-red-500 p-4 rounded-xl text-center animate-in shake font-bold mb-6">
                             {error}
                         </div>
                     )}
 
-                    <div className="pt-8 pb-20 flex flex-col sm:flex-row gap-4">
+                    {status !== 'submitted' && (
+                        <div className="bg-blue-500/10 border border-blue-500/50 p-6 rounded-2xl mb-8 flex items-start gap-4 animate-in fade-in relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                            <div className="bg-blue-500/20 text-blue-400 p-3 rounded-full shrink-0 relative z-10">
+                                <AlertTriangle size={24} />
+                            </div>
+                            <div className="relative z-10">
+                                <h3 className="text-xl font-black text-blue-400 uppercase tracking-tight mb-2">PLAZO ORDINARIO CERRADO</h3>
+                                <p className="text-gray-300 mb-2 leading-relaxed">
+                                    El plazo general finalizó el 2 de Marzo. Actualmente, tu grupo quedará guardado como <strong className="text-white">BORRADOR</strong>.
+                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed mb-3">
+                                    Podrás rellenar los datos y subir todos los archivos sin problema. Sin embargo, el botón de "Enviar Inscripción Definitiva" solo estará disponible si la organización habilita plazas a la categoría que has seleccionado.
+                                </p>
+                                <div className="flex items-start gap-2 text-md font-bold text-yellow-500 bg-yellow-500/10 p-3 rounded-xl border border-yellow-500/20">
+                                    <div className="shrink-0 mt-0.5">
+                                        <AlertTriangle size={16} className="text-yellow-500" />
+                                    </div>
+                                    <p>Os recordamos que a partir de ahora las inscripciones de cada participante serán de 5€.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="pt-2 pb-20 flex flex-col sm:flex-row gap-4">
                         <button
                             type="button"
                             onClick={handleSaveDraft}

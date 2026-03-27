@@ -58,7 +58,7 @@ export const sessions: Session[] = [
     {
         id: 'block1',
         name: 'Bloque 1',
-        date: '2026-03-29T09:30:00',
+        date: '2026-03-29T09:00:00',
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [
@@ -68,7 +68,7 @@ export const sessions: Session[] = [
     {
         id: 'block2',
         name: 'Bloque 2',
-        date: '2026-03-29T11:30:00',
+        date: '2026-03-29T10:45:00',
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [
@@ -88,7 +88,7 @@ export const sessions: Session[] = [
     {
         id: 'block4',
         name: 'Bloque 4',
-        date: '2026-03-29T17:00:00',
+        date: '2026-03-29T16:45:00',
         totalSeats: initialSeats.length,
         soldCount: 0,
         categoryRows: [

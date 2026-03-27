@@ -116,6 +116,7 @@ export async function fetchPublicRankings(block: string, category: string) {
                     group_name,
                     school_name,
                     category,
+                    penalty,
                     is_confirmed
                 )
             `)
@@ -131,6 +132,7 @@ export async function fetchPublicRankings(block: string, category: string) {
             group_name: string,
             school_name: string,
             total: number,
+            penalty: number,
             breakdown: Record<string, number>
         }>();
 
@@ -143,9 +145,10 @@ export async function fetchPublicRankings(block: string, category: string) {
             if (!groupsMap.has(regId)) {
                 groupsMap.set(regId, {
                     id: regId,
-                    group_name: s.registrations.group_name,
+                    group_name: (s.registrations.group_name || "").toUpperCase(),
                     school_name: s.registrations.school_name,
                     total: 0,
+                    penalty: s.registrations.penalty || 0,
                     breakdown: {}
                 });
             }
@@ -172,9 +175,22 @@ export async function fetchPublicRankings(block: string, category: string) {
             }
         });
 
+        const groups = Array.from(groupsMap.values());
+        groups.forEach(g => {
+            g.total = g.total - g.penalty;
+        });
+
         // Convert to array and sort
-        const rankings = Array.from(groupsMap.values())
-            .sort((a, b) => b.total - a.total); // Descending score
+        const rankings = groups
+            .sort((a, b) => {
+                if (b.total !== a.total) return b.total - a.total; // Descending score
+                
+                // Tie-breaker based on Impresión Global
+                const aImpresion = (a.breakdown && a.breakdown['Impresión Global']) ? a.breakdown['Impresión Global'] : 0;
+                const bImpresion = (b.breakdown && b.breakdown['Impresión Global']) ? b.breakdown['Impresión Global'] : 0;
+                
+                return bImpresion - aImpresion;
+            });
 
         // Assign Rank (handling ties?)
         const rankedResults = rankings.map((r, index) => ({
