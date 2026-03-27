@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { fetchAllScores, fetchJudgesGlobalConfig, resetAllScoresAction, resetScoresByCategoryAction, updateRegistrationPenalty, fetchCategoryStatus, toggleCategoryStatusAction, updateAdminScore } from "@/app/actions-judges";
 import { Loader2, Trophy, RefreshCw, FileDown, Trash2, Lock, Unlock, Edit3, Check } from "lucide-react";
 import jsPDF from "jspdf";
@@ -66,7 +66,7 @@ export default function AdminLiveResults() {
     const [selectedBlock, setSelectedBlock] = useState('all');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [isCategoryClosed, setIsCategoryClosed] = useState(false);
-    const [editingScoresGroup, setEditingScoresGroup] = useState<any | null>(null);
+    const [editingRegistrationId, setEditingRegistrationId] = useState<string | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -97,7 +97,7 @@ export default function AdminLiveResults() {
     const activeJudges = Array.from({ length: judgesCount }, (_, i) => i + 1);
 
     // Process data to group by Registration and extract Judge Names
-    const processData = () => {
+    const { rows: unfilteredRows, judgeNames, allCriteria } = useMemo(() => {
         const grouped: Record<string, {
             registration_id: string,
             group_name: string,
@@ -116,19 +116,21 @@ export default function AdminLiveResults() {
 
         scores.forEach((score) => {
             const regId = score.registration_id;
-            grouped[regId] = {
-                registration_id: regId,
-                group_name: (score.registrations?.group_name || 'Desconocido').toUpperCase(),
-                school_name: score.registrations?.school_name || 'Desconocido',
-                block: score.block,
-                category: score.category,
-                penalty: score.registrations?.penalty || 0,
-                total: 0,
-                finalTotal: 0,
-                impresionGlobal: 0,
-                judges: {},
-                detailedJudges: {}
-            };
+            if (!grouped[regId]) {
+                grouped[regId] = {
+                    registration_id: regId,
+                    group_name: (score.registrations?.group_name || 'Desconocido').toUpperCase(),
+                    school_name: score.registrations?.school_name || 'Desconocido',
+                    block: score.block,
+                    category: score.category,
+                    penalty: score.registrations?.penalty || 0,
+                    total: 0,
+                    finalTotal: 0,
+                    impresionGlobal: 0,
+                    judges: {},
+                    detailedJudges: {}
+                };
+            }
             grouped[regId].total += score.score;
             grouped[regId].judges[score.judge_id] = (grouped[regId].judges[score.judge_id] || 0) + score.score;
 
@@ -175,11 +177,7 @@ export default function AdminLiveResults() {
             judgeNames: resolvedNames,
             allCriteria: allCriteriaConfigRow
         };
-    };
-
-
-
-    const { rows: unfilteredRows, judgeNames, allCriteria } = processData();
+    }, [scores, judgesCount]);
 
     const uniqueBlocks = Array.from(new Set(unfilteredRows.map((r: any) => r.block).filter(Boolean))).sort() as string[];
     
@@ -198,6 +196,11 @@ export default function AdminLiveResults() {
         if (!name) return '';
         return name.replace(/Block/gi, 'Bloque ');
     };
+
+    const editingScoresGroup = useMemo(() => {
+        if (!editingRegistrationId) return null;
+        return unfilteredRows.find(r => r.registration_id === editingRegistrationId) || null;
+    }, [editingRegistrationId, unfilteredRows]);
 
     useEffect(() => {
         if (selectedCategory !== 'all') {
@@ -551,7 +554,7 @@ export default function AdminLiveResults() {
                                             <div className="text-gray-500 text-xs">{row.school_name}</div>
                                         </div>
                                         <button 
-                                            onClick={() => setEditingScoresGroup(row)} 
+                                            onClick={() => setEditingRegistrationId(row.registration_id)} 
                                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 opacity-0 group-hover/row:opacity-100 transition-all"
                                             title="Editar notas de los jueces"
                                         >
@@ -658,7 +661,7 @@ export default function AdminLiveResults() {
                         <div className="mt-8 flex justify-end">
                             <button 
                                 onClick={() => {
-                                    setEditingScoresGroup(null);
+                                    setEditingRegistrationId(null);
                                     load(); // Full refresh on exit
                                 }} 
                                 className="px-8 py-3 bg-white text-black hover:bg-zinc-200 shadow-xl shadow-white/10 rounded-xl font-black transition-all active:scale-95 flex items-center gap-2"
