@@ -113,17 +113,18 @@ export default function AdminLiveResults() {
         }> = {};
 
         const namesMap: Record<number, Set<string>> = {};
+        const allCriteriaSet = new Set<string>();
 
-        scores.forEach((score) => {
-            const regId = score.registration_id;
+        scores.forEach((reg: any) => {
+            const regId = reg.id;
             if (!grouped[regId]) {
                 grouped[regId] = {
                     registration_id: regId,
-                    group_name: (score.registrations?.group_name || 'Desconocido').toUpperCase(),
-                    school_name: score.registrations?.school_name || 'Desconocido',
-                    block: score.block,
-                    category: score.category,
-                    penalty: score.registrations?.penalty || 0,
+                    group_name: (reg.group_name || 'Desconocido').toUpperCase(),
+                    school_name: reg.school_name || 'Desconocido',
+                    block: reg.block,
+                    category: reg.category,
+                    penalty: reg.penalty || 0,
                     total: 0,
                     finalTotal: 0,
                     impresionGlobal: 0,
@@ -131,22 +132,29 @@ export default function AdminLiveResults() {
                     detailedJudges: {}
                 };
             }
-            grouped[regId].total += score.score;
-            grouped[regId].judges[score.judge_id] = (grouped[regId].judges[score.judge_id] || 0) + score.score;
 
-            if (score.criteria_name === 'Impresión Global') {
-                grouped[regId].impresionGlobal += score.score;
-            }
+            if (reg.scores && Array.isArray(reg.scores)) {
+                reg.scores.forEach((score: any) => {
+                    grouped[regId].total += score.score;
+                    grouped[regId].judges[score.judge_id] = (grouped[regId].judges[score.judge_id] || 0) + score.score;
 
-            if (!grouped[regId].detailedJudges[score.judge_id]) {
-                grouped[regId].detailedJudges[score.judge_id] = {};
-            }
-            grouped[regId].detailedJudges[score.judge_id][score.criteria_name] = score.score;
+                    if (score.criteria_name === 'Impresión Global') {
+                        grouped[regId].impresionGlobal += score.score;
+                    }
 
-            // Track names
-            if (score.judge_name) {
-                if (!namesMap[score.judge_id]) namesMap[score.judge_id] = new Set();
-                namesMap[score.judge_id].add(score.judge_name);
+                    if (!grouped[regId].detailedJudges[score.judge_id]) {
+                        grouped[regId].detailedJudges[score.judge_id] = {};
+                    }
+                    grouped[regId].detailedJudges[score.judge_id][score.criteria_name] = score.score;
+
+                    allCriteriaSet.add(score.criteria_name);
+
+                    // Track names
+                    if (score.judge_name) {
+                        if (!namesMap[score.judge_id]) namesMap[score.judge_id] = new Set();
+                        namesMap[score.judge_id].add(score.judge_name);
+                    }
+                });
             }
         });
 
@@ -163,7 +171,7 @@ export default function AdminLiveResults() {
             }
         });
 
-        const allCriteriaConfigRow = Array.from(new Set(scores.map(s => s.criteria_name).filter(Boolean))).sort() as string[];
+        const allCriteriaConfigRow = Array.from(allCriteriaSet).sort();
 
         // Convert to array and sort by Final Total Descending, then by Impresion Global Descending
         return {

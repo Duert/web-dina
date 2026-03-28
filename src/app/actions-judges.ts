@@ -286,15 +286,23 @@ export async function resetScoresByCategoryAction(block: string, category: strin
 export async function fetchAllScores() {
     try {
         const { data, error } = await supabaseAdmin
-            .from('scores')
+            .from('registrations')
             .select(`
-                *,
-                registrations (
-                    group_name,
-                    school_name,
-                    penalty
+                id,
+                group_name,
+                school_name,
+                block,
+                category,
+                penalty,
+                scores (
+                    judge_id,
+                    judge_name,
+                    criteria_name,
+                    score
                 )
-            `);
+            `)
+            .eq('is_confirmed', true)
+            .order('order_index', { ascending: true });
 
         if (error) throw error;
         return { success: true, data };
