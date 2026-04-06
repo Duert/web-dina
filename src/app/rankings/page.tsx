@@ -1,23 +1,63 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { sessions } from '@/lib/data';
-import { fetchPublicRankings } from '@/app/actions-rankings';
-import { Trophy, Medal, Ribbon, AlertCircle, Loader2 } from 'lucide-react';
+import { fetchPublicRankings, logInteraction } from '@/app/actions-rankings';
+import { Trophy, Medal, Ribbon, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RankingsPage() {
     const [selectedBlock, setSelectedBlock] = useState(sessions[0]?.id || 'block1');
-    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(() => {
+        const firstBlock = sessions[0];
+        return firstBlock?.categoryRows?.flat()[0] || '';
+    });
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notPublished, setNotPublished] = useState(false);
+    const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
     const [judgeNames, setJudgeNames] = useState<Record<string, string>>({});
 
+    // --- Analytics ---
+    const getSessionId = useCallback(() => {
+        if (typeof window === 'undefined') return 'server';
+        let sid = localStorage.getItem('dina_session_id');
+        if (!sid) {
+            sid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('dina_session_id', sid);
+        }
+        return sid;
+    }, []);
+
+    // Log Page View
+    useEffect(() => {
+        logInteraction({
+            sessionId: getSessionId(),
+            eventType: 'page_view',
+            pagePath: '/rankings',
+            block: selectedBlock
+        });
+    }, [getSessionId, selectedBlock]);
+
+    // Log Category Selection
+    useEffect(() => {
+        if (selectedCategory) {
+            logInteraction({
+                sessionId: getSessionId(),
+                eventType: 'category_selection',
+                pagePath: '/rankings',
+                category: selectedCategory,
+                block: selectedBlock
+            });
+        }
+    }, [selectedCategory, selectedBlock, getSessionId]);
+
     // Get categories for selected block
-    const activeCategories = sessions.find(s => s.id === selectedBlock)?.categoryRows?.flat() || [];
+    const activeCategories = useMemo(() => {
+        return sessions.find(s => s.id === selectedBlock)?.categoryRows?.flat() || [];
+    }, [selectedBlock]);
 
     const loadRankings = useCallback(async () => {
         setLoading(true);
@@ -26,34 +66,46 @@ export default function RankingsPage() {
         setResults([]);
         setJudgeNames({});
 
-        const res = await fetchPublicRankings(selectedBlock, selectedCategory);
+        try {
+            const res = await fetchPublicRankings(selectedBlock, selectedCategory);
 
-        if (res.success) {
-            setResults(res.data || []);
-            setJudgeNames(res.judges || {});
-        } else if (res.notPublished) {
-            setNotPublished(true);
-        } else {
-            setError(res.error || "Error cargando resultados");
+            if (res.success) {
+                setResults(res.data || []);
+                setJudgeNames(res.judges || {});
+            } else if (res.notPublished) {
+                setNotPublished(true);
+            } else {
+                setError(res.error || "Error cargando resultados");
+            }
+        } catch (err) {
+            console.error(err);
+            setError("Error de conexión al servidor");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [selectedBlock, selectedCategory]);
 
+    // Unified Control Effect: Selection -> Load
     useEffect(() => {
-        setTimeout(() => {
-            if (activeCategories.length > 0) {
+        // 1. Sync selection: if categories available and current not in, set first
+        if (activeCategories.length > 0) {
+            if (!selectedCategory || !activeCategories.includes(selectedCategory)) {
                 setSelectedCategory(activeCategories[0]);
+                // Return early to wait for the state update
+                return;
             }
-        }, 0);
-    }, [selectedBlock, activeCategories]);
+        }
 
+        // 2. Load data: Only if valid combination
+        if (selectedBlock && selectedCategory && activeCategories.includes(selectedCategory)) {
+            loadRankings();
+        }
+    }, [selectedBlock, selectedCategory, activeCategories, loadRankings]);
+
+    // Cleanup expanded state when results change
     useEffect(() => {
-        setTimeout(() => {
-            if (selectedBlock && selectedCategory) {
-                loadRankings();
-            }
-        }, 0);
-    }, [selectedBlock, selectedCategory, loadRankings]);
+        setExpandedGroupId(null);
+    }, [results]);
 
     const getMedalColor = (rank: number) => {
         switch (rank) {
@@ -98,7 +150,11 @@ export default function RankingsPage() {
                             {sessions.map(s => (
                                 <button
                                     key={s.id}
-                                    onClick={() => setSelectedBlock(s.id)}
+                                    onClick={() => {
+                                        setSelectedBlock(s.id);
+                                        setResults([]); // Immediate feedback
+                                        setLoading(true);
+                                    }}
                                     className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedBlock === s.id
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                                         : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
@@ -168,75 +224,138 @@ export default function RankingsPage() {
                         <div className="text-center py-12 text-slate-500">No hay datos de puntuación disponibles.</div>
                     ) : (
                         <div className="space-y-3 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                            {results.map((item, idx) => (
+                            {results.map((item) => (
                                 <div
                                     key={item.id}
-                                    className={`relative p-5 rounded-2xl border flex items-center gap-4 md:gap-8 overflow-hidden group ${getRowStyle(item.rank)}`}
+                                    onClick={() => {
+                                        const isExpanding = expandedGroupId !== item.id;
+                                        setExpandedGroupId(prev => prev === item.id ? null : item.id);
+                                        if (isExpanding) {
+                                            logInteraction({
+                                                sessionId: getSessionId(),
+                                                eventType: 'group_expansion',
+                                                pagePath: '/rankings',
+                                                category: selectedCategory,
+                                                groupName: item.group_name,
+                                                block: selectedBlock
+                                            });
+                                        }
+                                    }}
+                                    className={`relative p-5 rounded-2xl border flex flex-col transition-all cursor-pointer hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] overflow-hidden group ${getRowStyle(item.rank)}`}
                                 >
-                                    {/* Rank Badge */}
-                                    <div className="shrink-0 flex flex-col items-center justify-center w-12 text-center md:w-16">
-                                        <span className={`text-3xl md:text-4xl font-black heading-font ${getMedalColor(item.rank)}`}>
-                                            {item.rank}
-                                        </span>
-                                        <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Posición</span>
-                                    </div>
+                                    <div className="flex items-center gap-4 md:gap-8">
+                                        {/* Rank Badge */}
+                                        <div className="shrink-0 flex flex-col items-center justify-center w-12 text-center md:w-16">
+                                            <span className={`text-3xl md:text-4xl font-black heading-font ${getMedalColor(item.rank)}`}>
+                                                {item.rank}
+                                            </span>
+                                            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Posición</span>
+                                        </div>
 
-                                    {/* Group Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-lg md:text-xl font-bold truncate pr-4 text-white group-hover:text-blue-400 transition-colors">
-                                            {item.group_name}
-                                        </h3>
-                                        <p className="text-slate-400 text-sm flex items-center gap-2">
-                                            <span className="bg-slate-800 px-2 py-0.5 rounded text-xs font-bold text-slate-300">{item.school_name}</span>
-                                        </p>
+                                        {/* Group Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg md:text-xl font-bold truncate pr-4 text-white group-hover:text-blue-400 transition-colors">
+                                                {item.group_name}
+                                            </h3>
+                                            <p className="text-slate-400 text-sm flex items-center gap-2">
+                                                <span className="bg-slate-800 px-2 py-0.5 rounded text-xs font-bold text-slate-300">{item.school_name}</span>
+                                            </p>
 
-                                        {/* Criteria Breakdown (Optional: Show top criteria or collapsed) */}
-                                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                                            {Object.entries(item.breakdown)
-                                                .sort(([keyA], [keyB]) => {
-                                                    const order = [
-                                                        'Musicalidad',
-                                                        'Técnica',
-                                                        'Actitud',
-                                                        'Innovación',
-                                                        'Sincronía',
-                                                        'Ejecución de la coreografía',
-                                                        'Utilización del espacio',
-                                                        'Imagen y vestuario',
-                                                        'Variedad de estilos',
-                                                        'Impresión Global'
-                                                    ];
-                                                    const idxA = order.indexOf(keyA);
-                                                    const idxB = order.indexOf(keyB);
-                                                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-                                                })
-                                                .slice(0, 3).map(([key, val]) => (
-                                                    <span key={key} className="bg-black/30 px-2 py-1 rounded border border-white/5">
-                                                        {key}: <span className="text-slate-300 font-bold">{val as number}</span>
+                                            {/* Preview criteria (hidden when expanded) */}
+                                            {expandedGroupId !== item.id && (
+                                                <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-slate-500 md:text-xs">
+                                                    {Object.entries(item.breakdown)
+                                                        .sort(([keyA], [keyB]) => {
+                                                            const order = [
+                                                                'Musicalidad',
+                                                                'Técnica',
+                                                                'Actitud',
+                                                                'Innovación',
+                                                                'Sincronía',
+                                                                'Ejecución de la coreografía',
+                                                                'Utilización del espacio',
+                                                                'Imagen y vestuario',
+                                                                'Variedad de estilos',
+                                                                'Impresión Global'
+                                                            ];
+                                                            const idxA = order.indexOf(keyA);
+                                                            const idxB = order.indexOf(keyB);
+                                                            return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                                                        })
+                                                        .slice(0, 2).map(([key, val]) => (
+                                                            <span key={key} className="bg-black/30 px-2 py-1 rounded border border-white/5">
+                                                                {key}: <span className="text-slate-300 font-bold">{val as number}</span>
+                                                            </span>
+                                                        ))}
+                                                    <span className="px-2 py-1 text-blue-400 font-bold flex items-center gap-1">
+                                                        Ver detalle <ChevronDown size={12} />
                                                     </span>
-                                                ))}
-                                            {(Object.keys(item.breakdown).length > 3) && (
-                                                <span className="px-2 py-1">+ {Object.keys(item.breakdown).length - 3} criterios</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Total Score */}
+                                        <div className="shrink-0 text-right pl-4 border-l border-white/5">
+                                            <div className="text-3xl md:text-4xl font-black text-white tabular-nums tracking-tight">
+                                                {item.total}
+                                            </div>
+                                            <div className="text-[10px] uppercase font-bold text-slate-500 text-right">Puntos</div>
+                                            {item.penalty > 0 && (
+                                                <div className="text-[10px] uppercase font-bold text-red-400 text-right mt-1">
+                                                    -{item.penalty} Pen.
+                                                </div>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Total Score */}
-                                    <div className="shrink-0 text-right pl-4 border-l border-white/5">
-                                        <div className="text-3xl md:text-4xl font-black text-white tabular-nums tracking-tight">
-                                            {item.total}
-                                        </div>
-                                        <div className="text-[10px] uppercase font-bold text-slate-500 text-right">Puntos</div>
-                                        {item.penalty > 0 && (
-                                            <div className="text-[10px] uppercase font-bold text-red-400 text-right mt-1">
-                                                -{item.penalty} Pen.
+                                    {/* Expanded Detail */}
+                                    {expandedGroupId === item.id && (
+                                        <div className="mt-6 pt-6 border-t border-white/10 animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                                                {Object.entries(item.breakdown)
+                                                    .sort(([keyA], [keyB]) => {
+                                                        const order = [
+                                                            'Musicalidad',
+                                                            'Técnica',
+                                                            'Actitud',
+                                                            'Innovación',
+                                                            'Sincronía',
+                                                            'Ejecución de la coreografía',
+                                                            'Utilización del espacio',
+                                                            'Imagen y vestuario',
+                                                            'Variedad de estilos',
+                                                            'Impresión Global'
+                                                        ];
+                                                        const idxA = order.indexOf(keyA);
+                                                        const idxB = order.indexOf(keyB);
+                                                        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                                                    })
+                                                    .map(([key, val]) => (
+                                                        <div key={key} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0 md:last:border-b">
+                                                            <span className="text-sm text-slate-400 font-medium">{key}</span>
+                                                            <span className="text-lg font-black text-blue-400 tabular-nums">{val as number}</span>
+                                                        </div>
+                                                    ))}
                                             </div>
-                                        )}
-                                    </div>
+                                            
+                                            {item.penalty > 0 && (
+                                                <div className="mt-4 p-3 bg-red-950/30 rounded-xl border border-red-500/20 flex justify-between items-center">
+                                                    <span className="text-sm font-bold text-red-400 uppercase tracking-wider">Penalizaciones / Descuentos</span>
+                                                    <span className="text-xl font-black text-red-500">-{item.penalty}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="mt-6 flex justify-center text-slate-500 text-[10px] uppercase font-bold tracking-[0.2em] border-t border-white/5 pt-4">
+                                                <button className="flex items-center gap-2 hover:text-white transition-colors">
+                                                    Cerrar detalle <ChevronUp size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Decorative Trophy for 1st place */}
                                     {item.rank === 1 && (
-                                        <div className="absolute -top-4 -right-4 opacity-10 rotate-12 pointer-events-none">
+                                        <div className="absolute -top-4 -right-4 opacity-10 rotate-12 pointer-events-none group-hover:opacity-20 transition-opacity">
                                             <Trophy size={120} />
                                         </div>
                                     )}

@@ -291,7 +291,6 @@ export async function fetchAllScores() {
                 id,
                 group_name,
                 school_name,
-                block,
                 category,
                 penalty,
                 scores (

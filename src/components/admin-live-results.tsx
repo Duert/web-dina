@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { fetchAllScores, fetchJudgesGlobalConfig, resetAllScoresAction, resetScoresByCategoryAction, updateRegistrationPenalty, fetchCategoryStatus, toggleCategoryStatusAction, updateAdminScore } from "@/app/actions-judges";
-import { Loader2, Trophy, RefreshCw, FileDown, Trash2, Lock, Unlock, Edit3, Check } from "lucide-react";
+import { Loader2, Trophy, RefreshCw, FileDown, Trash2, Lock, Unlock, Edit3, Check, MousePointer2 } from "lucide-react";
+import { sessions } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -88,10 +90,24 @@ export default function AdminLiveResults() {
     };
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         load();
-        const interval = setInterval(load, 30000);
-        return () => clearInterval(interval);
+        
+        // Listen to realtime changes in 'scores' table to refresh data
+        const channel = supabase
+            .channel('admin-scores-monitor')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'scores' 
+            }, () => {
+                // When any score changes, fetch fresh data
+                load();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const activeJudges = Array.from({ length: judgesCount }, (_, i) => i + 1);
@@ -116,15 +132,21 @@ export default function AdminLiveResults() {
         const allCriteriaSet = new Set<string>();
 
         scores.forEach((reg: any) => {
-            const regId = reg.id;
-            if (!grouped[regId]) {
-                grouped[regId] = {
-                    registration_id: regId,
-                    group_name: (reg.group_name || 'Desconocido').toUpperCase(),
-                    school_name: reg.school_name || 'Desconocido',
-                    block: reg.block,
-                    category: reg.category,
-                    penalty: reg.penalty || 0,
+                const regId = reg.id;
+                
+                // Infer block ID from category using sessions constant
+                const inferredBlockId = sessions.find(s => 
+                    s.categoryRows?.flat().includes(reg.category)
+                )?.id || 'unknown';
+
+                if (!grouped[regId]) {
+                    grouped[regId] = {
+                        registration_id: regId,
+                        group_name: (reg.group_name || 'Desconocido').toUpperCase(),
+                        school_name: reg.school_name || 'Desconocido',
+                        block: inferredBlockId,
+                        category: reg.category,
+                        penalty: reg.penalty || 0,
                     total: 0,
                     finalTotal: 0,
                     impresionGlobal: 0,
@@ -187,14 +209,21 @@ export default function AdminLiveResults() {
         };
     }, [scores, judgesCount]);
 
-    const uniqueBlocks = Array.from(new Set(unfilteredRows.map((r: any) => r.block).filter(Boolean))).sort() as string[];
+    const uniqueBlocks = [
+        { id: 'all', name: 'Todos los bloques' },
+        ...sessions.map(s => ({ id: s.id, name: s.name }))
+    ];
     
     let rows = unfilteredRows;
     if (selectedBlock !== 'all') {
         rows = rows.filter((r: any) => r.block === selectedBlock);
     }
     
-    const uniqueCategories = Array.from(new Set(rows.map((r: any) => r.category).filter(Boolean))).sort() as string[];
+    // Find categories for currently selected block from data constant using ID
+    const currentBlockConfig = sessions.find(s => s.id === selectedBlock);
+    const uniqueCategories = currentBlockConfig 
+        ? ['all', ...(currentBlockConfig.categoryRows?.flat() || [])]
+        : ['all'];
     
     if (selectedCategory !== 'all') {
         rows = rows.filter((r: any) => r.category === selectedCategory);
@@ -508,8 +537,8 @@ export default function AdminLiveResults() {
                         }}
                     >
                         <option value="all">Todos los bloques</option>
-                        {uniqueBlocks.map(b => (
-                            <option key={b} value={b}>{b}</option>
+                        {uniqueBlocks.filter(b => b.id !== 'all').map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
                         ))}
                     </select>
                 </div>
@@ -522,8 +551,8 @@ export default function AdminLiveResults() {
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
                         >
-                            <option value="all">Todas las categorías</option>
-                            {uniqueCategories.map(c => (
+                            <option value="all">Selecciona una categoría...</option>
+                            {uniqueCategories.filter(c => c !== 'all').map(c => (
                                 <option key={c} value={c}>{c}</option>
                             ))}
                         </select>
@@ -531,8 +560,9 @@ export default function AdminLiveResults() {
                 )}
             </div>
 
-            <div className="overflow-x-auto bg-slate-900 border border-white/10 rounded-xl">
-                <table className="w-full text-left border-collapse text-sm">
+            {selectedBlock !== 'all' && selectedCategory !== 'all' ? (
+                <div className="overflow-x-auto bg-slate-900 border border-white/10 rounded-xl animate-in fade-in duration-500">
+                    <table className="w-full text-left border-collapse text-sm">
                     <thead>
                         <tr className="bg-white/5 border-b border-white/10 text-gray-400 font-bold uppercase text-xs">
                             <th className="p-4">#</th>
@@ -606,6 +636,17 @@ export default function AdminLiveResults() {
                     </tbody>
                 </table>
             </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-32 bg-slate-900/30 border border-dashed border-white/10 rounded-3xl text-gray-500 gap-4">
+                    <div className="p-4 bg-white/5 rounded-full">
+                        <MousePointer2 size={32} className="text-gray-600" />
+                    </div>
+                    <div className="text-center">
+                        <h3 className="text-lg font-bold text-gray-400">Selección Requerida</h3>
+                        <p className="text-sm max-w-xs px-4">Por favor, selecciona un Bloque y una Categoría para visualizar los resultados en tiempo real.</p>
+                    </div>
+                </div>
+            )}
 
             {/* Modal for editing specific scores */}
             {editingScoresGroup && (

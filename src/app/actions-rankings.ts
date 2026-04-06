@@ -205,3 +205,111 @@ export async function fetchPublicRankings(block: string, category: string) {
         return { success: false, error: error.message };
     }
 }
+
+
+// --- ANALYTICS: INTERACTIONS ---
+
+export async function logInteraction(data: {
+    sessionId: string;
+    eventType: 'page_view' | 'category_selection' | 'group_expansion';
+    pagePath: string;
+    category?: string;
+    groupName?: string;
+    block?: string;
+    metadata?: any;
+}) {
+    try {
+        const { error } = await supabaseAdmin
+            .from('page_interactions')
+            .insert({
+                session_id: data.sessionId,
+                event_type: data.eventType,
+                page_path: data.pagePath,
+                category: data.category,
+                group_name: data.groupName,
+                block: data.block,
+                metadata: data.metadata || {}
+            });
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error logging interaction:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function fetchInteractionStats() {
+    try {
+        // 1. Total Visits (Page Views)
+        const { count: totalViews, error: viewsError } = await supabaseAdmin
+            .from('page_interactions')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_type', 'page_view');
+
+        if (viewsError) throw viewsError;
+
+        // 2. Unique Sessions
+        const { data: uniqueSessions, error: sessionsError } = await supabaseAdmin
+            .rpc('count_unique_sessions'); // If we have an RPC, otherwise we'll fetch and count unique strings (dangerous for large data)
+
+        // Since I don't have the RPC, I'll use a simpler query for now
+        const { data: sessionsData, error: sError } = await supabaseAdmin
+            .from('page_interactions')
+            .select('session_id');
+
+        if (sError) throw sError;
+        const uniqueSessionCount = new Set(sessionsData?.map(s => s.session_id)).size;
+
+        // 3. Most viewed categories
+        const { data: categoryStats, error: catError } = await supabaseAdmin
+            .from('page_interactions')
+            .select('category')
+            .eq('event_type', 'category_selection')
+            .not('category', 'is', null);
+
+        if (catError) throw catError;
+        
+        const categoryCounts: Record<string, number> = {};
+        categoryStats?.forEach(s => {
+            categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1;
+        });
+
+        // 4. Most expanded groups
+        const { data: groupStats, error: groupError } = await supabaseAdmin
+            .from('page_interactions')
+            .select('group_name')
+            .eq('event_type', 'group_expansion')
+            .not('group_name', 'is', null);
+
+        if (groupError) throw groupError;
+
+        const groupCounts: Record<string, number> = {};
+        groupStats?.forEach(s => {
+            groupCounts[(s.group_name || "").toUpperCase()] = (groupCounts[(s.group_name || "").toUpperCase()] || 0) + 1;
+        });
+
+        // Sort results
+        const sortedCategories = Object.entries(categoryCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 15);
+
+        const sortedGroups = Object.entries(groupCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 15);
+
+        return {
+            success: true,
+            stats: {
+                totalViews,
+                uniqueSessions: uniqueSessionCount,
+                categories: sortedCategories,
+                groups: sortedGroups
+            }
+        };
+
+    } catch (error: any) {
+        console.error("Error fetching stats:", error);
+        return { success: false, error: error.message };
+    }
+}

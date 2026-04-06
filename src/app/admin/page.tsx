@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Users, Building, Download, RefreshCw, Trash2, Gavel, Lock, LayoutDashboard, FileText, X, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle, Building2, Mail, Phone, Music, ChevronLeft, Filter, MoreVertical, CheckCircle2, XCircle, User as UserIcon, Unlock, ArrowUp, ArrowDown, ArrowUpDown, MessageSquare, Send, ArrowRight, ChevronDown, ChevronUp, Trophy } from "lucide-react";
+import { ArrowLeft, Users, Building, Download, RefreshCw, Trash2, Gavel, Lock, LayoutDashboard, FileText, X, Eye, Ticket, Calendar, Search, Check, Clock, AlertTriangle, Building2, Mail, Phone, Music, ChevronLeft, Filter, MoreVertical, CheckCircle2, XCircle, User as UserIcon, Unlock, ArrowUp, ArrowDown, ArrowUpDown, MessageSquare, Send, ArrowRight, ChevronDown, ChevronUp, Trophy, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -25,6 +25,7 @@ import { AdminSidebarNotificationBadge } from "@/components/admin/notification-b
 import dynamic from "next/dynamic";
 import AdminQuotasManager from "@/components/admin-quotas-manager";
 import AdminNotesManager from "@/components/admin-notes-manager";
+import AdminPhotocallManager from "@/components/admin-photocall-manager";
 
 const PDFExportButton = dynamic(
     () => import("@/components/pdf/PDFExportButton").then((mod) => mod.PDFExportButton),
@@ -56,7 +57,7 @@ export default function AdminPage() {
     // Data State
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'schools' | 'config' | 'judges' | 'faq' | 'seating' | 'quotas' | 'notes'>('registrations');
+    const [activeTab, setActiveTab] = useState<'registrations' | 'sales' | 'schools' | 'config' | 'judges' | 'faq' | 'seating' | 'quotas' | 'notes' | 'photocall'>('registrations');
     const [groupRegistrationEnabled, setGroupRegistrationEnabled] = useState(false);
     const [publicSalesEnabled, setPublicSalesEnabled] = useState(false);
 
@@ -745,6 +746,12 @@ export default function AdminPage() {
                         >
                             Ver Contabilidad & Aforo
                         </Link>
+                        <Link
+                            href="/admin/stats"
+                            className="text-sm font-bold text-blue-500 hover:text-white transition-colors border border-blue-500 px-3 py-1.5 rounded-lg hover:bg-blue-500 flex items-center gap-2"
+                        >
+                            <BarChart3 size={16} /> Ver Estadísticas
+                        </Link>
                         <button onClick={() => setIsAuthenticated(false)} className="text-sm text-gray-400 hover:text-white">
                             Cerrar Sesión
                         </button>
@@ -799,6 +806,13 @@ export default function AdminPage() {
                         Notas Internas
                         {activeTab === 'notes' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-yellow-500" />}
                     </button>
+                    <button
+                        onClick={() => setActiveTab('photocall')}
+                        className={`pb-4 px-2 font-medium transition-colors relative ${activeTab === 'photocall' ? 'text-blue-500' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Fotos Photocall
+                        {activeTab === 'photocall' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500" />}
+                    </button>
                     <Link
                         href="/admin/scores"
                         className="pb-4 px-2 font-medium transition-colors relative text-gray-400 hover:text-white flex items-center gap-2"
@@ -823,7 +837,11 @@ export default function AdminPage() {
                 </div>
 
                 {/* Content */}
-                {activeTab === 'notes' ? (
+                {activeTab === 'photocall' ? (
+                    <div className="space-y-6">
+                        <AdminPhotocallManager />
+                    </div>
+                ) : activeTab === 'notes' ? (
                     <div className="space-y-6">
                         <AdminNotesManager
                             registrations={sortedRegistrations}

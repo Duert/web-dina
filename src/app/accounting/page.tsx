@@ -213,7 +213,8 @@ export default async function AccountingPage() {
             const session = sessions.find(s => s.id === t.session_id);
             const blockName = session ? session.name : "Desconocido";
 
-            const isFree = (t.price || 0) === 0;
+            const ticketPrice = (t.price || 0);
+            const isFree = ticketPrice === 0;
             const categoryName = isFree ? "Organización / Invitaciones" : "Venta Manual";
 
             if (!breakdown[blockName]) breakdown[blockName] = {};
@@ -224,6 +225,9 @@ export default async function AccountingPage() {
             breakdown[blockName][categoryName].tickets_confirmed += 1;
             confirmedTickets += 1;
             totalTicketsAssigned += 1;
+            
+            // [FIX] Add revenue from manual sales to the total
+            ticketsRevenueConfirmed += ticketPrice;
         });
 
         // Calculate logical totals per block for consistent KPI cards
@@ -370,7 +374,7 @@ export default async function AccountingPage() {
                                         <span className="font-bold text-slate-300">{dancersRevenueConfirmed + dancersRevenuePending}€</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Entradas Totales:</span>
+                                        <span>Entradas (Inscrip. + Manual):</span>
                                         <span className="font-bold text-slate-300">{ticketsRevenueConfirmed + ticketsRevenuePending}€</span>
                                     </div>
                                 </div>
@@ -384,7 +388,7 @@ export default async function AccountingPage() {
                                         <span className="font-bold">{dancersRevenueConfirmed}€</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Entradas (Grupos):</span>
+                                        <span>Entradas (Bruto):</span>
                                         <span className="font-bold">{ticketsRevenueConfirmed}€</span>
                                     </div>
                                 </div>

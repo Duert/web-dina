@@ -20,6 +20,7 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState("");
   const [rankingsVisible, setRankingsVisible] = useState(false);
   const [isOrderPublished, setIsOrderPublished] = useState(false);
+  const [photocallPublished, setPhotocallPublished] = useState(false);
 
   useEffect(() => {
     // Countdown Logic
@@ -52,13 +53,14 @@ export default function Home() {
       // We assume settings are in table 'app_settings', row id=1
       const { data } = await supabase
         .from('app_settings')
-        .select('public_rankings_visible, is_order_published')
+        .select('public_rankings_visible, is_order_published, photocall_published')
         .eq('id', 1)
         .single();
 
       if (data) {
         setRankingsVisible(data.public_rankings_visible);
         setIsOrderPublished(data.is_order_published);
+        setPhotocallPublished(data.photocall_published);
       }
     };
     fetchSettings();
@@ -99,6 +101,42 @@ export default function Home() {
           <p className="text-lg md:text-xl text-[var(--primary)] mt-2 font-bold tracking-widest uppercase drop-shadow-[0_0_10px_rgba(255,0,204,0.5)]">
             29 de marzo
           </p>
+        </div>
+
+        {/* Beneficial Cause Section - MOVED FROM BELOW */}
+        <div className="w-full mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+          <div className="bg-gradient-to-r from-pink-500/10 via-white/5 to-pink-500/10 border border-pink-500/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-md">
+            <div className="text-left md:w-2/3">
+              <span className="bg-pink-500 text-white text-[10px] font-bold px-3 py-1 rounded-full mb-3 inline-block uppercase tracking-wider">EVENTO 100% BENÉFICO</span>
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-2 italic">"Bailamos por una Causa"</h3>
+              <p className="text-pink-100/70 leading-relaxed mb-4 text-sm">
+                Desde <strong className="text-white text-base">2015</strong>, todos los beneficios recaudados en este campeonato son donados íntegramente a la <strong className="text-white">Associació Contra el Càncer de La Vall d'Uixó</strong>.
+              </p>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4 max-w-sm">
+                <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                  <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest mb-1">Recaudado 2026</p>
+                  <p className="text-2xl font-black text-[var(--primary)] tabular-nums">6.112€</p>
+                </div>
+                <div className="bg-black/30 p-3 rounded-xl border border-white/5">
+                  <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest mb-1">Total (11 años)</p>
+                  <p className="text-2xl font-black text-white tabular-nums">54.641€</p>
+                </div>
+              </div>
+            </div>
+            <div className="md:w-1/3 flex justify-center md:justify-end">
+              <div className="bg-white p-3 rounded-xl shadow-lg rotate-2 hover:rotate-0 transition-transform duration-500 max-w-[150px]">
+                <Image
+                  src="/logo-cancer-vall.png"
+                  alt="Associació Contra el Càncer La Vall"
+                  width={150}
+                  height={60}
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Info Grid */}
@@ -202,52 +240,18 @@ export default function Home() {
               </Link>
             )}
 
-            <h3 className="text-white font-bold text-sm tracking-wider opacity-70 mb-1 mt-2">DESCARGAS</h3>
-
-            <a
-              href="/docs/bases_2026.pdf?v=2"
-              target="_blank"
-              download
-              className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
-            >
-              <div className="bg-white/10 p-2 rounded-lg group-hover:bg-[var(--primary)]/20 transition-colors">
-                <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-white text-sm">BASES 2026</h3>
-                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Descargar reglamento</p>
-              </div>
-            </a>
-
-            <a
-              href="/docs/autorizacion_menores.pdf"
-              target="_blank"
-              download
-              className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
-            >
-              <div className="bg-white/10 p-2 rounded-lg group-hover:bg-[var(--primary)]/20 transition-colors">
-                <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-white text-sm">AUTORIZACIÓN</h3>
-                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Menores de edad</p>
-              </div>
-            </a>
-
-            <a
-              href="/docs/autorizacion_mayores.pdf"
-              target="_blank"
-              download
-              className="w-full bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/10 hover:border-[var(--primary)] hover:scale-[1.02] transition-all group shadow-lg shadow-black/20"
-            >
-              <div className="bg-white/10 p-2 rounded-lg group-hover:bg-[var(--primary)]/20 transition-colors">
-                <FileText className="w-6 h-6 text-pink-300 group-hover:text-white transition-colors" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-white text-sm">AUTORIZACIÓN</h3>
-                <p className="text-xs text-gray-400 group-hover:text-pink-200 transition-colors">Mayores de edad</p>
-              </div>
-            </a>
+            {photocallPublished && (
+              <Link
+                href="/photocall"
+                className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 border border-cyan-400/30 p-4 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all group shadow-[0_0_20px_rgba(0,200,255,0.2)] mb-2 animate-in slide-in-from-right-4 fade-in duration-500"
+              >
+                <Camera className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+                <div className="text-left w-full pl-2">
+                  <h3 className="font-black text-white text-xl leading-none tracking-tight">FOTOS PHOTOCALL</h3>
+                  <p className="text-cyan-100 text-xs font-bold">Descarga tu foto</p>
+                </div>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -256,55 +260,10 @@ export default function Home() {
           <JudgesSection />
         </div>
 
-        {/* Beneficial Cause Section */}
-        <div className="w-full mb-16 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-          <div className="bg-gradient-to-r from-pink-500/10 via-white/5 to-pink-500/10 border border-pink-500/20 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md">
-            <div className="text-left md:w-1/2">
-              <span className="bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-4 inline-block">EVENTO 100% BENEFICO</span>
-              <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Bailamos por una Causa</h3>
-              <p className="text-pink-100/80 leading-relaxed mb-6">
-                Desde <strong className="text-white">2015</strong>, todos los beneficios recaudados en este campeonato son donados íntegramente a la <strong className="text-white">Associació Contra el Càncer de La Vall d'Uixó</strong>.
-              </p>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-                  <p className="text-gray-400 text-xs uppercase tracking-wider">Recaudado 2025</p>
-                  <p className="text-2xl font-black text-[var(--primary)]">7.797€</p>
-                </div>
-                <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-                  <p className="text-gray-400 text-xs uppercase tracking-wider">Total (10 años)</p>
-                  <p className="text-2xl font-black text-white">48.529€</p>
-                </div>
-              </div>
-            </div>
-            <div className="md:w-1/2 flex justify-center md:justify-end">
-              <div className="bg-white p-4 rounded-xl shadow-lg rotate-2 hover:rotate-0 transition-transform duration-500">
-                <Image
-                  src="/logo-cancer-vall.png"
-                  alt="Associació Contra el Càncer La Vall"
-                  width={200}
-                  height={80}
-                  className="object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* FAQ SECTION */}
-        <div className="w-full mb-24">
+        <div className="w-full mb-24 text-left">
           <FAQSection />
         </div>
-
-        {/* AVAILABILITY SECTION */}
-        <div className="w-full mb-24">
-          <AvailabilitySection />
-        </div>
-
-        {/* Purchase Section Removed as per user request (Box Office Only) */}
-
-
 
       </main >
 
